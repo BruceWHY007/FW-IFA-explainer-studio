@@ -1,0 +1,130 @@
+---
+name: FW-IFA-explainer-studio
+description: 把一条真人口播原片做成「图解口播」竖版成片（财经知识类的图解包装：深色电影感、玻璃卡、金属大字、中英双语标题、人物小窗、透视图表、持续缓动），基于 OpenMotion 出可编辑工程。一套统一骨架（底座章节进度条、字幕位置、头顶标题不压人、人脸安全取景、缓动语法）＋五套风格包（炭金／档案／矿石／瓷蓝／霓虹），每支片按内容挑版式、母题图标和强调色，同风格也不出一模一样的片子。macOS／Windows 通用；使用前先装基础 OpenMotion（https://github.com/nexu-io/openmotion，scripts/setup.py 一键装）。用户说「图解口播」「知识口播包装」「财经口播加图解」「用 OpenMotion 做口播」「五套风格里选一套」时使用。没有原片、要从文稿生成整片，或只写口播稿，不归这里。
+---
+
+# FW-IFA 图解口播 · explainer-studio
+
+真人口播原片 → OpenMotion 可编辑工程 → 成片。画面包装拆自 5 支财经知识类参考片（只借方法，不借内容和品牌），做成「一个骨架＋五套风格」。
+
+下文命令都在**本技能目录**里运行（`cd` 到 SKILL.md 所在的文件夹）。Windows 把 `python3` 换成 `py -3.11`。
+
+## 零、使用前准备：先装基础 OpenMotion，再走本技能
+
+本技能建在 **OpenMotion** 上：工程、检查、预览、Studio 编辑器、导出都靠它。没装 OpenMotion 时，只能做前期、测量和生成源码。
+
+- GitHub：https://github.com/nexu-io/openmotion
+- 安装说明（npm 发布版，本技能用这个）：https://github.com/nexu-io/openmotion/blob/main/docs/install.md
+- 版本号和校验值：https://releases.open-design.ai/motion
+- 本技能在 `@openmotion/app` **0.1.1** 上测试通过。源码安装需要 Node 26，不推荐。
+
+**第一步：运行安装脚本**
+
+```
+python3 scripts/setup.py --check      # 只检查，看缺什么
+python3 scripts/setup.py              # 装：OpenMotion 0.1.1 接到 Claude Code＋本技能依赖＋自检
+python3 scripts/setup.py --host claude --host codex --host deepseek --profile desktop   # 多个 Agent 一起接
+```
+
+脚本按顺序做：
+1. 查 Node 22.18+ 和 ffmpeg。缺了只给出安装命令，不替你装。
+2. 装 Pillow；Windows／Linux 还装 MediaPipe。
+3. 找本机 Chrome。
+4. 用官方命令装 OpenMotion：`npx --yes --package @openmotion/app@0.1.1 openmotion setup --host …`。
+5. 跑 `om.py doctor` 自检。
+
+接 Codex 时，如果已经用 claude 宿主装过，脚本只登记 MCP，不再复制一份技能，免得 Codex 读到两份。已经装过的机器，跑 `setup.py --check` 确认即可。
+
+**第二步（可选）：离线自检**：`python3 scripts/selftest.py`。不用任何真人视频，用占位人形和渐变素材把五套风格各构建一遍、跑 lint，几秒钟出结果；加 `--snapshot` 会抽帧。
+
+**第三步：请用户发一段口播视频试做。** 安装和自检通过后，Agent 主动对用户说：
+
+> 环境装好了。发一段 30–60 秒的口播视频给我试试：手机竖拍、对着镜头说一段话就行，最好头顶留一点空。再告诉我内容讲什么、想要哪种感觉（讲钱、讲机构、讲资源、讲品牌、讲科技），我按这个技能做一支样片，顺便帮你选风格。
+
+收到视频后按第四节流程做；第一次试做可以只做 30–60 秒，先确认人物测量、头顶标题、小窗取景和底座都正常。
+
+手动安装（脚本跑不了时）：
+
+| 要装的 | macOS | Windows |
+|-|-|-|
+| Node 22.18+ | `brew install node@22` | `winget install OpenJS.NodeJS.LTS` |
+| ffmpeg／ffprobe | `brew install ffmpeg` | `winget install Gyan.FFmpeg` |
+| Python 3.9–3.12＋Pillow | 系统自带 3.9＋`pip install pillow` | `py -3.11 -m pip install pillow` |
+| 人物测量 | 系统自带 Vision，不用装 | `py -3.11 -m pip install mediapipe==0.10.14 opencv-python-headless` |
+| **OpenMotion 0.1.1** | `npx --yes --package @openmotion/app@0.1.1 openmotion setup --host claude --skills-dir ~/.agents/skills` | 同一条命令 |
+| Chrome | 有就用本机的 | 有就用本机的；没有时 OpenMotion 会自己下载，走代理可能失败，先装 Chrome 更稳 |
+
+详见 [references/05-OpenMotion与跨平台.md](references/05-OpenMotion与跨平台.md)。
+
+## 一、统一骨架（五套风格都一样，不许改）
+
+| 部件 | 规则 |
+|-|-|
+| 画布 | 1080×1920、30fps。0–1576 是人物画面区，图解段也只在这一区排版；1576–1920 是底座。 |
+| 底座 | 全片常驻、盖在所有画面上面。平时显示章节进度条（3–6 章，编号＋章名，当前章点亮、下划线展开）；讲到需要更新或补充的事实时，换成「最新进展」卡（标题＋出处＋最多 2 个数字）。底座和人物画面交界处有一块署名牌。只放进度类和补充类信息，主要包装不放这里。 |
+| 字幕 | 得意黑 60px、白字、风格色阴影。人物段固定在 1300；图解段跟着版式走（横条下方、小窗上方或旁边），撞到小窗会自动让开或缩小字号。 |
+| 头顶标题 | 只放在头顶以上的空间。位置按实测头顶算，放不下就报错，改用身前卡片。头顶标题所在段自动关掉跳切推近。 |
+| 人物段元素 | 两侧标签贴在下巴两侧；身前卡片、名牌、数字、贴纸放在下巴以下；任何元素碰到头部范围（头顶到下巴、脸宽外扩 5%，按推近后的位置）build 直接失败。 |
+| 小窗 | 按这一段的人脸位置取景，脸完整、头顶留空，画面铺满窗口。圆窗直径 230–300，竖窗约 420×500 或 470×800。 |
+| 缓动 | 卡片、小窗、标签持续上下浮动（±6–10px、周期 3–4 秒、相邻元素错开）；透视面板和倾斜图表轻摆 2–4°。不允许画面静止。 |
+| 标题语法 | 中文大字＋字距拉开的英文副题；数字、图表一律标「示意 · ILLUSTRATIVE」，除非是核实过的真实数据。 |
+| 跳切 | 人物段在剪辑点交替原尺寸／放大 1.08 倍，推近原点在人脸中心。 |
+| 声音 | 人声 −16 LUFS；配乐侧链避让，约 −31 LUFS；成片约 −15 LUFS。入场有音效，图解段切入有过渡声。 |
+
+## 二、五套风格
+
+| 风格 | 参考题材 | 适合 | 材质与字 | 小窗 | 动作签名 | 招牌版式 |
+|-|-|-|-|-|-|-|
+| **炭金** tanjin | 黄金 | 宏观、市场、资产价格、上市估值 | 深炭底、金属渐变字、深色玻璃卡带虚线内框、粒子光球 | 大圆窗，左下 | 放大＋模糊收拢 | 大字横条、透视编号链、粒子金句 |
+| **档案** dangan | 保险公司 | 行业史、机构、风险、案例复盘、保险 | 暖黑纸面、铬银衬线字、珐琅白卡、火漆印章、品红光带 | 白边圆窗，右上 | 横向收拢＋纸张落下 | 机构墙、文件高亮、母题图标滚动章节卡 |
+| **矿石** kuangshi | 稀土 | 资源、地缘、产业链、大宗、政策博弈 | 石墨岩面、金框铭牌、酒红徽章、书法收尾 | 圆角方窗，居中在字幕下方 | 金色从左往右显出、3D 摆入 | 金框铭牌、A／B 对比、年份标尺横条 |
+| **瓷蓝** cilan | 酒店品牌 | 品牌、消费、商业模式、公司拆解 | 雾蓝底＋母题图标纹、白纸立体图表、蓝玻璃面板、全息环 | 细白边圆窗，左上 | 翻牌＋卡片抛落 | 滚动数字、白纸柱图、环形关系图 |
+| **霓虹** nihong | 游戏公司（横版改竖版） | 科技、互联网、娱乐、AI 产品、争议事件 | 黑紫底、霓虹描边、金色书法大字、斜切色块 | 霓虹边竖窗，左下 | 灯管闪亮、笔刷写出 | 倾斜面积图、霓虹产品排、书法金句 |
+
+选风格按题材，不按心情：先看内容是「讲钱」「讲机构」「讲资源」「讲品牌」还是「讲科技」，再看账号登记里最近用过什么。每套有 3 种强调色（`accent`），同一账号连续两支用同一风格时换强调色。细节见 [references/01-五套风格.md](references/01-五套风格.md)。
+
+## 三、同风格也要不一样：四个变化来源
+
+1. **版式按内容挑**：26 个版式（人物段 9＋图解段 17），按内容类型选——数字用滚动数字或对比，清单用编号链或层叠卡，人物用名牌，文件和新闻用文件高亮，机构用机构墙，对立概念用两侧标签，金句用金句卡。见 [references/02-版式库.md](references/02-版式库.md)。
+2. **母题图标按题材选**：每支片从图标库（Lucide 1539 个）里按内容挑 2–3 个，铺进背景纹样、章节卡滚动条和立方体。比如保险用公文包＋盾牌，AI 用芯片＋铃铛＋K 线。`python3 scripts/icons.py 关键词` 搜图标。
+3. **随机种子**：按片名生成，决定编号链、层叠卡、竖窗卡片的镜像方向，倾斜图表的倾斜方向，卡片抛落角度。同一份分镜表重建结果不变，换片名就换。
+4. **账号登记**：`build.py --register` 把风格、强调色、母题、图解版式序列记进 `data/registry.json`。同账号下一支片子如果开场两段版式一样、收尾版式＋强调色一样、母题一样，build 会提醒。
+
+build 自动查差异：图解版式不能连用（横条除外）、同一版式最多 2 次（横条 4、金句 3、章节卡 4）、至少用一个本风格招牌版式、90 秒以上至少 5 种图解版式、两侧对立标签最多 2 处。
+
+## 四、流程
+
+每次开工前可以先跑 `python3 scripts/om.py doctor` 确认环境。
+
+1. **转写**：要带字级时间戳的转写（格式见 03）。用户装了 IFA口播成片 技能时可以用它的 `scripts/ingest.py`；也可以用 whisper.cpp、FunASR 等。
+2. **定剪辑表**：读转写，去掉开头空白、重录、口误、现场对话，写 `edl.json`（原片里保留的时间段）。停顿超过 0.42 秒压到 0.26 秒。
+3. **校对稿**：对照原稿改错字（专有名词、数字），写 `fix.json`。字幕按本人实际说的话，用户给的文案一字不改。
+4. **前期**（`scripts/prep.py`）：`cut` → `voice` → `captions` → `base`；B-roll 用 `broll`／`image` 逐条处理；最后 `mix` 配乐。
+5. **量人物**：`python3 scripts/measure.py 工作目录/om_assets/aroll.mp4 geom.json`。macOS 用系统 Vision；Windows／Linux 用 MediaPipe（setup.py 已装）。
+6. **选风格、写分镜表** `plan.json`：章节、最新进展卡、母题、每段的版式和 data，时间都写全片秒数。写法见 [references/03-分镜表.md](references/03-分镜表.md)，示例见 `examples/demo/plan_demo.json`。
+7. **找 B-roll**：免费可商用片库（Pexels／Pixabay）。内容要对得上，宁可用抽象画面也不用张冠李戴的实拍。
+8. **建工程**：`om.py create` → `om.py import --manifest 工作目录/import.json`（生成 `assets.json`）。
+9. **构建**：`python3 scripts/build.py plan.json --assets assets.json --geom geom.json --out out`。有错误就改分镜表重来，警告要逐条看。
+10. **自查**：`om.py stage` → `om.py lint`（必须 0 错误）→ `om.py snapshot` 抽 12–15 帧，逐帧看：碰脸、遮挡、字幕被盖、字太小、空得太多、两段太像。
+11. **存版本、打开编辑器**：`om.py save` → `om.py preview --open`。用户在 Studio 里可以直接改字、调时间、换素材。
+12. **导出**：`om.py export --out 成片.mp4`，等技术校验通过（14 项）。然后 `build.py --register` 登记。
+13. **交付**：成片路径、编辑器网址、制作说明（剪了什么、风格和版式、素材授权、事实依据、已知限制）。
+
+各命令和跨平台细节见 [references/05-OpenMotion与跨平台.md](references/05-OpenMotion与跨平台.md)；人物测量和碰脸规则见 [references/04-人脸安全.md](references/04-人脸安全.md)。
+
+## 五、交付前自验
+
+- lint 0 错误；build_report.json 里 0 错误，警告逐条有交代。
+- 抽帧看过每一段；人物段没有任何元素压脸压头。
+- 事实性信息（日期、价格、数字）查过公开报道，最新进展卡标出处；本人说的话不改，用卡片补。
+- 图表没有真实数据就标「示意」，不编数字。
+- 成片里不出现参考账号的名字、logo、台标，只借方法。
+- 素材都有授权记录：B-roll 来自可商用片库；字体 OFL；图标 ISC；音效、配乐用有授权记录的。
+
+## 文件
+
+- `scripts/`：setup.py 安装（先装 OpenMotion）、selftest.py 离线自检、prep.py 前期、measure.py＋measure.swift 人物测量、build.py 构建、om.py OpenMotion 调用、icons.py 图标搜索、gen_textures.py 底纹（已生成）
+- `lib/tujie/`：core 骨架工具、styles 五套风格、frame 底座字幕和主时间线、layouts_host 人物段版式、layouts_graphic 图解段版式
+- `assets/`：fonts（得意黑、Inter、Oswald、站酷小薇、志莽行书，均 OFL，许可证在旁边）、icons（Lucide，ISC）、textures（程序生成）
+- `examples/demo/`：示例分镜表和字幕（占位内容，selftest.py 用它）
+- `references/06-参考片拆解.md`：5 支参考片拆出来的部件清单，加第六套风格时从这里开始
