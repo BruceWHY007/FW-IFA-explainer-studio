@@ -20,6 +20,9 @@ class BuildError(Exception):
     pass
 
 
+HOLD = 1.6  # 列表最后一项在画面上至少停留的秒数：入场动画约 0.3 秒，读完还要 1.05–1.3 秒
+
+
 class Seg:
     """一段：人物段（kind=host，透明叠加层）或图解段（kind=graphic，盖住人物，小窗里放人物）。"""
 
@@ -61,6 +64,10 @@ class Seg:
                 out.append(round(first + span * k / max(1, n), 3))
         for k in range(1, n):  # 说得快时顺延：相邻两项至少隔 0.6 秒，免得前一张还没进场就被压暗
             out[k] = round(min(max(out[k], out[k - 1] + gap), self.d - 0.3), 3)
+        lim = self.d - HOLD  # 说得晚时提前：最后一项至少在画面上停 HOLD 秒，前面各项跟着往前挪
+        for k in range(n - 1, -1, -1):
+            out[k] = round(max(0.2, min(out[k], lim)), 3)
+            lim = out[k] - gap
         return out
 
     def at(self, key, default):

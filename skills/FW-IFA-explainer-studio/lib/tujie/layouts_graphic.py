@@ -65,10 +65,11 @@ def card_img(seg_id, x, y, w, h, zh, en, img, num="", fs=56):
     numh = f'<div class="ab k" style="left:34px;top:{h / 2 - 60:.0f}px">{num}</div>' if num else ""
     tx = 150 if num else 40
     nl = zh.count("|") + 1
-    fs = min(fs, fit_fs(max(zh.split("|"), key=tw), w - tx - 30, fs, 28))  # 按卡宽缩字号，不换行
+    iw = w * 0.44 if img else 0  # 缩略图宽；渐隐到 28% 处已经半透明，字最多写到这里
+    fs = min(fs, fit_fs(max(zh.split("|"), key=tw), w - tx - (iw * 0.72 + 12 if img else 30), fs, 28))  # 按可用宽度缩字号，不换行
     ty = h / 2 - (nl * fs * 1.1 + 30) / 2
     ey = ty + nl * fs * 1.1 + 12
-    imgh = (f'<div class="ab grade" style="right:0;top:0;width:{w * 0.5:.0f}px;height:100%;background:url(\'{img}\') center/cover;'
+    imgh = (f'<div class="ab grade" style="right:0;top:0;width:{iw:.0f}px;height:100%;background:url(\'{img}\') center/cover;'
             f'-webkit-mask:linear-gradient(90deg,transparent,#000 60%);opacity:.9"></div>') if img else ""
     return (f'<div id="{seg_id}f" class="fl" style="left:{x:.0f}px;top:{y:.0f}px;width:{w:.0f}px;height:{h:.0f}px">'
             f'<div id="{seg_id}" class="card" style="left:0;top:0;width:{w:.0f}px;height:{h:.0f}px">{imgh}'
@@ -182,7 +183,7 @@ def band_scene(film, seg):
         ct = d["corner_tag"]
         ic = icon(ct["icon"], 36, "#2A1F12", 2) if ct.get("icon") else ""
         body += (f'<div id="{seg.id}-ct" class="tag" style="left:0;top:{by - 64}px;border-radius:0 10px 10px 0;padding-left:28px;display:flex;align-items:center;gap:10px">'
-                 f'<span>{rich(ct["zh"])}<span style="display:block;font:600 12px/1 EN,Inter;letter-spacing:3px;opacity:.6;margin-top:4px">{rich(ct.get("en", ""))}</span></span>{ic}</div>')
+                 f'<span>{rich(ct["zh"])}<span style="display:block;font:600 18px/1 EN,Inter;letter-spacing:3px;opacity:.7;margin-top:6px">{rich(ct.get("en", ""))}</span></span>{ic}</div>')
         s += f'tl.fromTo("#{seg.id}-ct",{{opacity:0,x:-120}},{{opacity:1,x:0,duration:0.45,ease:"power3.out"}},0.2);\n'
     if d.get("badge"):
         b = d["badge"]
@@ -246,8 +247,8 @@ def _bars_main(film, seg):
         body = bg + (f'<div id="{seg.id}-pf" class="fl" style="left:{(W - pw) / 2:.0f}px;top:250px;width:{pw}px;height:{ph_}px">'
                      f'<div id="{seg.id}-p" class="paper" style="left:0;top:0;width:{pw}px;height:{ph_}px">'
                      f'<div class="ab" style="left:80px;top:80px;width:520px;font:400 60px/1.1 SM;color:{st.c["navy"]}">{rich(d["title"]["zh"])}</div>'
-                     f'<div class="ab" style="left:82px;top:160px;font:600 18px/1 EN,Inter;letter-spacing:4px;color:#7A86A8;text-transform:uppercase">{rich(d["title"]["en"])}</div>'
-                     f'{grid}{bars_html}<div class="ab" style="right:50px;bottom:40px;font:600 16px/1 EN,Inter;letter-spacing:4px;color:#9AA3BC">{rich(d.get("note", NOTE))}</div></div></div>')
+                     f'<div class="ab" style="left:82px;top:160px;font:600 18px/1 EN,Inter;letter-spacing:4px;color:#4E5A7E;text-transform:uppercase">{rich(d["title"]["en"])}</div>'
+                     f'{grid}{bars_html}<div class="ab" style="right:50px;bottom:40px;font:600 16px/1 EN,Inter;letter-spacing:4px;color:#6B7591">{rich(d.get("note", NOTE))}</div></div></div>')
         s += (f'tl.set("#{seg.id}-p",{{transformPerspective:1600,transformOrigin:"50% 50%"}},0);\n'
               f'tl.fromTo("#{seg.id}-p",{{opacity:0,rotationY:-42,rotationX:12,x:120}},{{opacity:1,rotationY:-16,rotationX:5,x:0,duration:0.8,ease:"power3.out"}},0.05);\n'
               + sway(f"#{seg.id}-pf", seg.d, 2.5, 5.0, 0.9))
@@ -434,7 +435,7 @@ def _chain_list(film, seg):
         sy = min(140 + ph_ + 20, HOST_H - sfs - 150)
         sx = 60 if mirror else W - 60 - swd
         body += (f'<div id="{seg.id}-stamp" class="ab TR" style="left:{sx:.0f}px;top:{sy:.0f}px;font-size:{sfs}px;letter-spacing:6px;white-space:nowrap;opacity:0">{rich(sp["text"])}</div>'
-                 f'<div id="{seg.id}-stampen" class="ab EN" style="left:{sx + 10:.0f}px;top:{sy + sfs * 1.1:.0f}px;color:#FF8A80;letter-spacing:8px;opacity:0">{rich(sp.get("en", ""))}</div>')
+                 f'<div id="{seg.id}-stampen" class="ab EN" style="left:{sx + 10:.0f}px;top:{sy + sfs * 1.1 + swd * 0.07 + 6:.0f}px;color:#FF8A80;letter-spacing:8px;opacity:0">{rich(sp.get("en", ""))}</div>')
         stt = seg.at_t(sp, seg.d - 1.5)
         s += st.stamp_in(f"#{seg.id}-stamp", stt) + f'tl.fromTo("#{seg.id}-stampen",{{opacity:0}},{{opacity:1,duration:0.3}},{stt + 0.35:.3f});\n'
         film.sfx_at(seg, stt, "impact")

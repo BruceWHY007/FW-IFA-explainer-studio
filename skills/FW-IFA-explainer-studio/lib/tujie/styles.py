@@ -343,9 +343,9 @@ class Kuangshi(Style):
 class Cilan(Style):
     key, name, en = "cilan", "瓷蓝", "Porcelain Blue"
     accents = {
-        "cobalt": {"a": "#5B86FF", "argb": "91,134,255", "lt": "#A9C2FF", "navy": "#14285C", "li": "#B9A6FF"},
-        "teal": {"a": "#2FB5A8", "argb": "47,181,168", "lt": "#9EE6DD", "navy": "#0F3B3A", "li": "#9FD8FF"},
-        "violet": {"a": "#8B7BFF", "argb": "139,123,255", "lt": "#C9C1FF", "navy": "#26206A", "li": "#FFB3D9"},
+        "cobalt": {"a": "#5B86FF", "argb": "91,134,255", "lt": "#A9C2FF", "navy": "#14285C", "li": "#B9A6FF", "deep": "#2F55D9"},
+        "teal": {"a": "#2FB5A8", "argb": "47,181,168", "lt": "#9EE6DD", "navy": "#0F3B3A", "li": "#9FD8FF", "deep": "#1B7A71"},
+        "violet": {"a": "#8B7BFF", "argb": "139,123,255", "lt": "#C9C1FF", "navy": "#26206A", "li": "#FFB3D9", "deep": "#5543D1"},
     }
     pip = {"shape": "circle", "size": 230}
     chart, quote, chapter = "paper", "block", "hud"
@@ -380,14 +380,15 @@ class Cilan(Style):
 .chip{color:%(lt)s}
 .hud{position:absolute;border-radius:50%%;border:3px solid rgba(%(argb)s,.85);box-shadow:0 0 30px rgba(%(argb)s,.6),inset 0 0 30px rgba(%(argb)s,.35)}
 .hl{color:%(li)s;-webkit-text-fill-color:%(li)s}
+.paper .hl{color:%(deep)s !important;-webkit-text-fill-color:%(deep)s !important}
 .grade{filter:saturate(.8) contrast(.96) brightness(1.05)}.gradeov{position:absolute;inset:0;pointer-events:none;background:rgba(110,145,255,.18);mix-blend-mode:soft-light}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,#18202B,#0E131A)}
 .dkg{position:absolute;left:290px;top:1576px;width:500px;height:150px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.22),transparent 70%%)}
 .rule{position:absolute;left:0;right:0;top:1574px;height:2px;background:linear-gradient(90deg,transparent,rgba(200,215,255,.9) 30%%,rgba(200,215,255,.9) 70%%,transparent)}
 .badge{position:absolute;left:50%%;top:1548px;transform:translateX(-50%%);height:54px;padding:0 30px;border-radius:12px;text-align:center;background:linear-gradient(180deg,#FFFFFF,#E8E3D8);box-shadow:0 6px 18px rgba(0,0,0,.45);font:400 36px/54px SM;color:%(navy)s;white-space:nowrap}
-.badge b{color:%(a)s;font-weight:400}
-.chap .n{font:500 26px/1 NUM,SM;color:rgba(%(argb)s,.6);letter-spacing:2px}
+.badge b{color:%(deep)s;font-weight:400}
+.chap .n{font:500 26px/1 NUM,SM;color:%(a)s;letter-spacing:2px}
 .chap .l{font:400 40px/1 SM;color:rgba(255,255,255,.34);margin-top:8px}
 .chap .on .n{color:%(lt)s}.chap .on .l{color:#FFFFFF}
 .chap .u{background:rgba(255,255,255,.08)}

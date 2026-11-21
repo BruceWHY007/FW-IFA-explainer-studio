@@ -35,9 +35,11 @@ def chin(film, seg):
     return fy + fh, fh
 
 
-def topshade(seg, h):
+def topshade(seg, bottom):
+    """头顶标题的压暗：标题下沿以上保持够深（亮窗、天空前面字也看得清），再往下 90px 渐隐，只扫到头发顶。"""
+    h = max(430, bottom + 90)
     return (f'<div id="{seg.id}-shade" class="ab" style="left:0;right:0;top:0;height:{h:.0f}px;'
-            f'background:linear-gradient(180deg,rgba(6,8,12,.9) 0%,rgba(6,8,12,.62) 50%,rgba(6,8,12,0) 100%)"></div>')
+            f'background:linear-gradient(180deg,rgba(6,8,12,.92) 0px,rgba(6,8,12,.8) {bottom:.0f}px,rgba(6,8,12,0) {h:.0f}px)"></div>')
 
 
 def span_html(sp):
@@ -77,7 +79,7 @@ def title_top(film, seg):
         sizes = [int(s * k) for s in sizes]
         need = sum(sizes) + gap * (len(lines) - 1)
     y = top_lim + (avail - need) / 2
-    body = topshade(seg, max(430, head + 40))
+    body = topshade(seg, bottom)
     script = f'tl.fromTo("#{seg.id}-shade",{{opacity:0}},{{opacity:1,duration:0.3}},0);\n'
     for k, ln in enumerate(lines):
         txt, sp = _line_text(ln)
@@ -171,7 +173,7 @@ def chest_cards(film, seg):
         fs = min(120, fit_fs(txt, 960, 120), int(head - 22 - 170))
         if fs < 60:
             raise BuildError(f"{seg.id} 头顶空间不够放标题")
-        body += topshade(seg, max(430, head + 40))
+        body += topshade(seg, head - 22)
         body += (f'<div id="{seg.id}-h" class="ab" style="left:0;right:0;top:{170 + (head - 22 - 170 - fs) / 2:.0f}px;text-align:center;white-space:nowrap;'
                  f'font:400 {fs}px/1 SM;letter-spacing:6px;opacity:0">{span_html(sp)}</div>')
         s += f'tl.fromTo("#{seg.id}-shade",{{opacity:0}},{{opacity:1,duration:0.3}},0);\n' + st.title_in(f"#{seg.id}-h", seg.at_t(d["title"], 0.1))

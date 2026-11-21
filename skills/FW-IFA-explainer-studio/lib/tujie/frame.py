@@ -92,7 +92,7 @@ DOCK_LAYOUT_CSS = """
 .upd{position:absolute;left:36px;right:36px;top:1626px;height:176px;opacity:0}
 .upd .lab{position:absolute;left:30px;top:26px;display:flex;align-items:center;gap:12px;font:400 30px/1 SM}
 .upd .dot{width:14px;height:14px;border-radius:50%}
-.upd .lab small{font:600 15px/1 EN,Inter,sans-serif;letter-spacing:4px;opacity:.75}
+.upd .lab small{font:600 17px/1 EN,Inter,sans-serif;letter-spacing:4px;opacity:.75}
 .upd .ti{position:absolute;left:30px;top:74px;font-size:44px;line-height:1.1;white-space:nowrap}
 .upd .nt{position:absolute;left:30px;top:134px;font:600 17px/1 EN,Inter,sans-serif;letter-spacing:2px;color:rgba(255,255,255,.42)}
 .upd .sts{position:absolute;right:28px;top:30px;display:flex;gap:14px}

@@ -35,7 +35,7 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 
 接 Codex 时，如果已经用 claude 宿主装过，脚本只登记 MCP，不再复制一份技能，免得 Codex 读到两份。已经装过的机器，跑 `setup.py --check` 确认即可。
 
-**第二步（可选）：离线自检**：`python3 scripts/selftest.py`。不用任何真人视频，用占位人形和渐变素材，把示例分镜表、版式变体、自动草稿在五套风格下各构建一遍，跑 lint 和版面检查，约 2 分钟；加 `--snapshot` 会抽帧。
+**第二步（可选）：离线自检**：`python3 scripts/selftest.py`。不用任何真人视频，用占位人形和渐变素材，把示例分镜表、版式变体、自动草稿在五套风格下各构建一遍，跑 lint 和完整检查；加 `--snapshot` 会抽帧。
 
 **第三步：请用户发一段口播视频试做。** 安装和自检通过后，Agent 主动对用户说：
 
@@ -162,7 +162,7 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 8. **找 B-roll**：免费可商用片库（Pexels／Pixabay）。内容要对得上，宁可用抽象画面也不用张冠李戴的实拍。
 9. **建工程**：`om.py create` → `om.py import --manifest 工作目录/import.json`（生成 `assets.json`）。
 10. **构建**：`python3 scripts/build.py plan.json --assets assets.json --geom geom.json --out out`。有错误就改分镜表重来，警告要逐条看。
-11. **自查**：`om.py stage` → `om.py lint`（必须 0 错误）→ `om.py check`（全画面版面检查：文字互相压住、字幕压到卡片、超出画面、溢出容器，必须 0 处）→ `om.py snapshot` 抽 12–15 帧，逐帧看：碰脸、空得太多、两段太像、整片的节奏和色调有没有随内容起伏。
+11. **自查**：`om.py stage` → `om.py lint`（必须 0 错误）→ `om.py check`（渲染器自带的完整检查，约 35 秒：文字互相压住或被盖住、超出画面、字和底色太接近、停留太短来不及读、字太小；每段入场后、段尾和每个动画起止都取帧。「必须改」要 0 处，「要看」逐条判断，是设计如此就写进交付说明）→ `om.py snapshot` 抽 12–15 帧，逐帧看：碰脸、空得太多、两段太像、整片的节奏和色调有没有随内容起伏。
 12. **存版本、打开编辑器**：`om.py save` → `om.py preview --open`。用户在 Studio 里可以直接改字、调时间、换素材。
 13. **导出**：`om.py export --out 成片.mp4`，等技术校验通过（14 项）。然后 `build.py --register` 登记。
 14. **交付**：成片路径、编辑器网址、制作说明（剪了什么、风格和版式、素材授权、事实依据、已知限制），以及 `edl_report.json` 的待听清单（时间＋原话，请人听）。
@@ -171,7 +171,7 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 
 ## 五、交付前自验
 
-- lint 0 错误；`om.py check` 0 处；build_report.json 里 0 错误，警告逐条有交代。
+- lint 0 错误；`om.py check` 必须改 0 处、要看的逐条有交代；build_report.json 里 0 错误，警告逐条有交代。
 - 抽帧看过每一段；人物段没有任何元素压脸压头。
 - edl.py 自动剪掉的每一处，`--verify` 复核相似度 ≥0.85；待听清单已写进交付说明。
 - 事实性信息（日期、价格、数字）查过公开报道，最新进展卡标出处；本人说的话不改，用卡片补。
@@ -181,7 +181,7 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 
 ## 文件
 
-- `scripts/`：setup.py 安装（先装 OpenMotion）、selftest.py 离线自检、prep.py 前期、edl.py 剪辑表和重说卡顿检查、measure.py＋measure.swift 人物测量、style_preview.py 五套风格对照图（开工时请用户选）、draft_plan.py 分镜表草稿、build.py 构建、om.py OpenMotion 调用（含 check 版面检查）、icons.py 图标搜索、gen_textures.py 底纹和 gen_sfx.py 音效（都已生成）
+- `scripts/`：setup.py 安装（先装 OpenMotion）、selftest.py 离线自检、prep.py 前期、edl.py 剪辑表和重说卡顿检查、measure.py＋measure.swift 人物测量、style_preview.py 五套风格对照图（开工时请用户选）、draft_plan.py 分镜表草稿、build.py 构建、om.py OpenMotion 调用（含 check 完整检查）、icons.py 图标搜索、gen_textures.py 底纹和 gen_sfx.py 音效（都已生成）
 - `lib/tujie/`：core 骨架工具、styles 五套风格、frame 底座字幕和主时间线、layouts_host 人物段版式、layouts_graphic 图解段版式
 - `assets/`：fonts（得意黑、Inter、Oswald、站酷小薇、志莽行书，均 OFL，许可证在旁边）、icons（Lucide，ISC）、textures 和 sfx（程序生成，无版权问题）
 - `examples/demo/`：示例分镜表和字幕（占位内容）：plan_demo 全流程、plan_variants 版式变体；selftest.py 还会现场生成一份草稿一起测

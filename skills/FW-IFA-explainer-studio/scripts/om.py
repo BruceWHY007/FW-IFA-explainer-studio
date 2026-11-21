@@ -14,7 +14,7 @@
 
 import.json 格式：[{"key":"aroll","path":"/绝对路径/aroll.mp4","name":"显示名","license":"/同目录/许可.txt（字体才要）"}]
 """
-import argparse, json, os, platform, shutil, subprocess, sys, tempfile, time, uuid, webbrowser
+import argparse, json, os, platform, re, shutil, subprocess, sys, tempfile, time, uuid, webbrowser
 
 IS_WIN = platform.system() == "Windows"
 
@@ -252,8 +252,9 @@ def cmd_lint(a):
 
 
 def cmd_check(a):
-    """全画面版面检查：用渲染器自带的版面检查，在每段入场后和段尾各取一帧，查文字互相压住、超出画面、溢出容器。
-    装饰层和设计上的叠放（进度条亮暗两层、金句前后两句）已在生成时标注，不算问题。"""
+    """全画面检查：用渲染器自带的完整检查（版面＋对比度＋可读性＋运行），在每段入场后、段尾和每个动画起止各取一帧。
+    装饰层和设计上的叠放（进度条亮暗两层、金句前后两句）已在生成时标注，不算问题。
+    分两档：「必须改」退出码 1；「要看」打印出来逐条判断，不挡。"""
     rep = os.path.join(a.dir, "build_report.json")
     segs = json.load(open(rep, encoding="utf-8"))["segments"] if os.path.exists(rep) else []
     times = set()
@@ -264,20 +265,59 @@ def cmd_check(a):
     if a.at:
         times |= {float(x) for x in a.at.split(",")}
     at = ",".join(f"{t:g}" for t in sorted(times)) or "1"
-    r = subprocess.run([node(), hf_cli(), "inspect", os.path.abspath(a.dir), "--json", "--at", at, "--max-issues", "400", "--timeout", "15000"],
+    r = subprocess.run([node(), hf_cli(), "check", os.path.abspath(a.dir), "--json", "--at", at, "--at-transitions",
+                        "--max-transition-samples", "160", "--max-issues", "400", "--timeout", "20000"],
                        cwd=a.dir, capture_output=True, text=True, encoding="utf-8", env=tool_env())
     try:
         d = json.loads(r.stdout[r.stdout.index("{"):r.stdout.rindex("}") + 1])
     except Exception:
-        sys.exit("版面检查没跑起来：" + (r.stdout + r.stderr)[-1200:])
+        sys.exit("检查没跑起来：" + (r.stdout + r.stderr)[-1200:])
     seg_at = lambda t: next((s[0] for s in segs if s[3] - 0.01 <= t < s[4]), "?")
-    real = [x for x in d.get("issues", []) if x["code"] in ("content_overlap", "canvas_overflow", "text_box_overflow") and x["severity"] != "info"]
-    names = {"content_overlap": "文字互相压住", "canvas_overflow": "超出画面", "text_box_overflow": "文字溢出容器"}
-    print(f"{'✓ 版面检查通过' if not real else '✗ 版面有问题'}：抽查 {len(times)} 个时间点，{len(real)} 处问题")
-    for x in real:
-        print(f"  {x.get('time', 0):6.2f}s [{seg_at(x.get('time', 0))}] {names[x['code']]}：{x.get('selector', '')} "
-              f"{('↔ ' + x['containerSelector']) if x.get('containerSelector') else ''} 「{(x.get('text') or '')[:20]}」")
-    sys.exit(1 if real else 0)
+    names = {"content_overlap": "文字互相压住", "canvas_overflow": "超出画面", "text_box_overflow": "文字溢出容器",
+             "clipped_text": "文字被裁掉", "text_occluded": "文字被盖住", "text_not_painted": "文字没画出来",
+             "caption_zone_collision": "压到字幕区", "frame_out_of_frame": "出画", "contrast_aa_failure": "字和底色太接近",
+             "line_unread": "停留太短来不及读", "text_below_floor": "字太小", "runtime_script_error": "脚本报错"}
+    must, look = [], []
+    mid = {round(t, 2) for t in (d.get("layout") or {}).get("transitionSamples") or []} - {round(t, 2) for t in times}
+    for sec in ("runtime", "layout", "contrast", "craft"):
+        for x in (d.get(sec) or {}).get("findings") or []:
+            c, sev = x.get("code"), x.get("severity")
+            if sev == "info" or c in ("clip_media_fit", "panel_out_of_canvas") or (c == "container_overflow" and "-pip" in (x.get("selector") or "")):
+                continue  # 音效槽比音效长、底座和小窗的浮动外溢：渲染时自动处理，不是画面问题
+            if c == "contrast_aa_failure" and all(round(t, 2) in mid for t in x.get("times") or [x.get("time") or 0]):
+                continue  # 只在动画半途（淡入淡出）的帧上不够清楚，不算
+            if c == "contrast_aa_failure":
+                (must if x.get("ratio", 9) < 2.2 or sev == "error" else look).append(x)
+                x["_note"] = f"{x.get('ratio')}:1，至少要 {x.get('requiredRatio')}:1"
+            elif c in ("content_overlap", "text_occluded") and x.get("heldMs") is not None and x["heldMs"] < 300:
+                look.append(x)  # 入场飞过标题这类，压住不到 0.3 秒
+                x["_note"] = f"动画途中一闪，{int(x['heldMs'])} 毫秒"
+            elif c == "text_occluded":
+                (must if (x.get("coveredFraction") or 0) >= 0.3 else look).append(x)
+                x["_note"] = f"盖住 {int((x.get('coveredFraction') or 0) * 100)}%"
+            elif c == "line_unread":
+                look.append(x)
+                x["_note"] = f"只停 {x.get('seconds')} 秒，至少要 {x.get('floorSeconds')} 秒"
+            elif c == "text_below_floor":
+                m = re.search(r"renders at (\d+) ?px", x.get("message", ""))
+                if m and int(m.group(1)) < 16:  # 风格里的小号字距英文是装饰；16px 以下手机上看不出是字
+                    x["_note"] = f"{m.group(1)}px"
+                    look.append(x)
+            elif sev == "error" or c in names:
+                must.append(x)
+    show = lambda x: (f"  {x.get('time') or 0:6.2f}s [{seg_at(x.get('time') or 0)}] {names.get(x['code'], x['code'])}"
+                      f"{('（' + x['_note'] + '）') if x.get('_note') else ''}：{x.get('selector', '')} "
+                      f"{('↔ ' + x['containerSelector']) if x.get('containerSelector') else ''} 「{(x.get('text') or '')[:20]}」")
+    lay = d.get("layout") or {}
+    print(f"{'✓ 检查通过' if not must else '✗ 有必须改的问题'}：抽查 {len(lay.get('samples') or times)} 个时间点＋{len(lay.get('transitionSamples') or [])} 个动画衔接点，"
+          f"必须改 {len(must)} 处，要看 {len(look)} 处")
+    for x in must:
+        print(show(x))
+    if look:
+        print("要看（逐条判断，是设计如此就在交付说明里交代）：")
+        for x in look:
+            print(show(x))
+    sys.exit(1 if must else 0)
 
 
 def cmd_snapshot(a):
