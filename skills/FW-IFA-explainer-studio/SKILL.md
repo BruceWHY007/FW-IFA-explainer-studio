@@ -145,14 +145,16 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 
 每次开工前可以先跑 `python3 scripts/om.py doctor` 确认环境。
 
-1. **转写**：要带字级时间戳的转写（格式见 03）。用户装了 IFA口播成片 技能时可以用它的 `scripts/ingest.py`；也可以用 whisper.cpp、FunASR 等。
-2. **校对稿**：对照原稿改错字（专有名词、数字），写 `fix.json`；开头空白、现场对话、明显的废句写进 `drop`。字幕按本人实际说的话，用户给的文案一字不改。
-3. **剪辑表＋查重说卡顿**：`python3 scripts/edl.py --transcript transcript.json --src 原片.mp4 --work 工作目录 --fix fix.json --verify`。
-   - 转写模型常把「说到一半停住、又从头说一遍」合成一句，只看文字会漏，所以 edl.py 同时看三个信号：语速低于本人中位语速的 6 成、同一段声音在一句里出现两次、和后面 3 句文字很像。
-   - 慢＋声音重复 → 自动剪掉第一遍，留最后完整的一遍（`--verify` 把留下的那遍单独再转写一次核对）；文字相似度 >0.7 → 删前一句；只有一个信号 → 进「待听清单」，不剪，交付时请人听。
-   - 只留一遍完整的，不把几遍的碎片拼成一句；第一遍里后面没再说的铺垫要留。句间停顿超过 0.42 秒压到 0.26 秒。
-   - 产物：`edl.json`、`transcript_edl.json`（剪掉第一遍的句子逐字时间已重排，下一步字幕用它）、`edl_report.json`。
-4. **前期**（`scripts/prep.py`）：`cut` → `voice` → `captions --transcript 工作目录/transcript_edl.json` → `base --style 推荐风格`；B-roll 用 `broll`／`image` 逐条处理；最后 `mix` 配乐。
+1. **转写**：要带字级时间戳的转写（格式见 03）。用户装了 IFA口播成片 技能时可以用它的 `scripts/ingest.py`（不用传 `--model`，它自己找 `~/.cache/whisper-cpp/ggml-small.bin`）；也可以用 whisper.cpp、FunASR 等。下一步找重说也要 whisper-cli 和这个模型。
+2. **校对稿**：对照原稿改错字（专有名词、数字），写 `fix.json`；开头空白、现场对话、明显的废句写进 `drop`。字幕按本人实际说的话，用户给的文案一字不改。重说和改口不用手动找，下一步自动处理。
+3. **剪辑表＋找重说**：`python3 scripts/edl.py --transcript transcript.json --src 原片.mp4 --work 工作目录 --fix fix.json`，约 20 秒。
+   - 整段转写会把「说一半停住、再从头说一遍」合成一句，文字上看不出来。edl.py 按停顿把声音切成一个个发声段，每段单独转写，再比相邻两段的读音（拼音）：后一段和前一段开头相同（改口），或前一段结尾和后一段开头相同（尾头重复），就是重说。另外查整句重说。
+   - **只留最后一遍完整、准确的说法**：从放弃那遍开口前的停顿，剪到最后一遍开口前的停顿，不碰任何一个字；第一遍里后面没再说的铺垫要留。
+   - 句尾按声音找真正说完的地方，说完后至少留 0.10 秒。句间停顿超过 0.42 秒压到约 0.26 秒，不压到零。
+   - 每处剪完自动复核：接起来的那几秒再转写一次，确认重复的话只剩一遍。剪掉的字会从 fix.json 的改字里一起删掉（原文件存为 `fix.json.bak`）。
+   - 产物：`edl.json`、`edl_joins.json`、`transcript_edl.json`（下一步字幕用它）、`edl_report.json`（自动处理、待听清单、接点检查，交付时逐条交代）。判据、剪法和例子见 [references/07-重说与口误.md](references/07-重说与口误.md)。
+4. **前期**（`scripts/prep.py`）：`cut` → `voice` → `captions --transcript 工作目录/transcript_edl.json --fix fix.json` → `base --style 推荐风格`；B-roll 用 `broll`／`image` 逐条处理；最后 `mix` 配乐。
+   - `cut` 给每段两头加 12 毫秒淡入淡出，接点没有咔哒声；同时写 `joins.json`，标出每个接点是停顿还是重说。重说接点离镜头切换 0.3 秒以内时，build 把镜头切换挪到接点上；落在人物段中间的，靠跳切推近换一次景别遮住。
 5. **量人物**：`python3 scripts/measure.py 工作目录/om_assets/aroll.mp4 geom.json`。macOS 用系统 Vision；Windows／Linux 用 MediaPipe（setup.py 已装）。
 6. **请用户选风格（问一次）**：`python3 scripts/style_preview.py --work 工作目录 --geom geom.json --transcript transcript.json --title "开头标题|*重点*" --sub "副标题" --phrase "片中一句金句" --account 账号`，约 40 秒。
    - 出一张五套风格对照图：每套两格，用本人画面配头顶标题，再配一格图解金句。按转写内容标出推荐和备选，并写明理由（讲钱／机构／资源／品牌／科技各命中哪些词）。
@@ -167,13 +169,17 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 13. **导出**：`om.py export --out 成片.mp4`，等技术校验通过（14 项）。然后 `build.py --register` 登记。
 14. **交付**：成片路径、编辑器网址、制作说明（剪了什么、风格和版式、素材授权、事实依据、已知限制），以及 `edl_report.json` 的待听清单（时间＋原话，请人听）。
 
-各命令和跨平台细节见 [references/05-OpenMotion与跨平台.md](references/05-OpenMotion与跨平台.md)；人物测量和碰脸规则见 [references/04-人脸安全.md](references/04-人脸安全.md)。
+**改了剪辑表要重剪时**（用户指出还有重说、改了 fix.json）：用户说的是成片时间，先 `python3 scripts/recut.py --work 工作目录 --where 成片秒数` 查出原片时间和那句的逐字时间，要剪的原片区间写进 fix.json 的 `"cut": [[起, 止]]`（重跑也保留，不要手改 edl.json）。然后 `python3 scripts/recut.py --work 工作目录 --plan plan.json --geom geom.json --out out`，一条命令按顺序重跑剪辑表、剪辑、人声、字幕、配乐、量人物、搬分镜表时间、导入、构建、检查、查剩下的重说，约 2–3 分钟。不要手动一步步重跑：漏掉导入会导出「新画面配旧声音」，手算分镜表时间容易搬错。几处问题攒在一起改完再重剪、再导出，不要改一处导一次。
+
+重说／卡顿／口误的判据、剪法、复核口径见 [references/07-重说与口误.md](references/07-重说与口误.md)；各命令和跨平台细节见 [references/05-OpenMotion与跨平台.md](references/05-OpenMotion与跨平台.md)；人物测量和碰脸规则见 [references/04-人脸安全.md](references/04-人脸安全.md)。
 
 ## 五、交付前自验
 
 - lint 0 错误；`om.py check` 必须改 0 处、要看的逐条有交代；build_report.json 里 0 错误，警告逐条有交代。
 - 抽帧看过每一段；人物段没有任何元素压脸压头。
-- edl.py 自动剪掉的每一处，`--verify` 复核相似度 ≥0.85；待听清单已写进交付说明。
+- edl.py 自动剪掉的每一处复核都通过，接点检查 0 个不合格；待听清单已写进交付说明。
+- `python3 scripts/edl.py --scan 工作目录/om_assets/voice.wav` 显示没有重说（recut.py 会自动跑）。
+- 抽帧看过每个重说接点（`joins.json` 里 kind 是 retake 的时间）：画面换了景别，或正好是镜头切换。
 - 事实性信息（日期、价格、数字）查过公开报道，最新进展卡标出处；本人说的话不改，用卡片补。
 - 图表没有真实数据就标「示意」，不编数字。
 - 成片里不出现参考账号的名字、logo、台标，只借方法。
@@ -181,7 +187,8 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 
 ## 文件
 
-- `scripts/`：setup.py 安装（先装 OpenMotion）、selftest.py 离线自检、prep.py 前期、edl.py 剪辑表和重说卡顿检查、measure.py＋measure.swift 人物测量、style_preview.py 五套风格对照图（开工时请用户选）、draft_plan.py 分镜表草稿、build.py 构建、om.py OpenMotion 调用（含 check 完整检查）、icons.py 图标搜索、gen_textures.py 底纹和 gen_sfx.py 音效（都已生成）
+- `scripts/`：setup.py 安装（先装 OpenMotion）、selftest.py 离线自检、prep.py 前期、edl.py 剪辑表和找重说（逐段转写比读音；`--scan` 只查不剪）、recut.py 改了剪辑表后一条命令重剪、measure.py＋measure.swift 人物测量、style_preview.py 五套风格对照图（开工时请用户选）、draft_plan.py 分镜表草稿、build.py 构建、om.py OpenMotion 调用（含 check 完整检查）、icons.py 图标搜索、gen_textures.py 底纹和 gen_sfx.py 音效（都已生成）
+- `data/`：pinyin.txt 拼音字表、t2s.txt 繁简字表（都由系统转换生成，找重说时比读音用）、registry.json 账号登记
 - `lib/tujie/`：core 骨架工具、styles 五套风格、frame 底座字幕和主时间线、layouts_host 人物段版式、layouts_graphic 图解段版式
 - `assets/`：fonts（得意黑、Inter、Oswald、站酷小薇、志莽行书，均 OFL，许可证在旁边）、icons（Lucide，ISC）、textures 和 sfx（程序生成，无版权问题）
 - `examples/demo/`：示例分镜表和字幕（占位内容）：plan_demo 全流程、plan_variants 版式变体；selftest.py 还会现场生成一份草稿一起测

@@ -4,6 +4,7 @@
 所有命令都以「工作目录 W」为中心：素材生成到 W/om_assets/，导入清单累积在 W/import.json（om.py import 用）。
 
   python prep.py cut      --work W --src 原片.mp4 --edl edl.json        剪辑：保留段 → aroll.mp4（1080×1920，无声）＋voice_raw.wav＋cuts.json
+                                                                         ＋joins.json（每个接点是停顿还是重说）；每段两头 12ms 淡入淡出，接点不咔哒
   python prep.py voice    --work W                                       人声：低切 70Hz、轻压缩、两遍响度统一到 −16 LUFS → voice.wav
   python prep.py captions --work W --transcript transcript.json [--fix fix.json]   字幕：按剪辑映射时间、断句（≤14 字）。
                                                                          校对过的句子（fix.json）按标点和 | 断；没校对的按词边界和停顿断
@@ -63,7 +64,12 @@ def cmd_cut(a):
     o = om(a.work)
     n = len(edl)
     v = "".join(f"[0:v]trim={x}:{y},setpts=PTS-STARTPTS[v{k}];" for k, (x, y) in enumerate(edl))
-    au = "".join(f"[0:a]atrim={x}:{y},asetpts=PTS-STARTPTS[a{k}];" for k, (x, y) in enumerate(edl))
+    # 每段两头加 12ms 淡入淡出：拼接处波形不连续会有"咔哒"一声（重说接点尤其明显）
+    FADE = 0.012
+    au = "".join(
+        f"[0:a]atrim={x}:{y},asetpts=PTS-STARTPTS,afade=t=in:st=0:d={FADE},"
+        f"afade=t=out:st={max(0.0, (y - x) - FADE):.3f}:d={FADE}[a{k}];"
+        for k, (x, y) in enumerate(edl))
     cat = "".join(f"[v{k}][a{k}]" for k in range(n)) + f"concat=n={n}:v=1:a=1[vc][ac];"
     scale = f"[vc]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,fps={FPS},{BT709}[vo]"
     ff("-i", a.src, "-filter_complex", v + au + cat + scale, "-map", "[vo]", *ENC, "-an", os.path.join(o, "aroll.mp4"),
@@ -74,6 +80,12 @@ def cmd_cut(a):
         cuts.append(round(acc, 3))
     json.dump(edl, open(os.path.join(a.work, "edl_frames.json"), "w"), indent=0)
     json.dump(cuts, open(os.path.join(a.work, "cuts.json"), "w"))
+    # 接点类型（edl.py 写的 edl_joins.json）：重说接点 build 会尽量让镜头切换落在上面
+    kp = os.path.join(os.path.dirname(os.path.abspath(a.edl)), "edl_joins.json")
+    kinds = json.load(open(kp)) if os.path.exists(kp) else []
+    if len(kinds) != len(cuts):
+        kinds = ["pause"] * len(cuts)
+    json.dump([{"t": t, "kind": k} for t, k in zip(cuts, kinds)], open(os.path.join(a.work, "joins.json"), "w"))
     dur = float(probe(os.path.join(o, "aroll.mp4"), "-show_entries", "format=duration"))
     manifest_add(a.work, "aroll", os.path.join(o, "aroll.mp4"), "口播－剪辑版（无声）")
     print(f"aroll.mp4 {dur:.2f}s，{n} 段，剪辑点 {len(cuts)} 个")
@@ -311,6 +323,7 @@ def cmd_mix(a):
        f"[1:a]aresample=48000,apad=whole_dur={dur}[v];[m][v]sidechaincompress=threshold=0.04:ratio=4:attack=25:release=450:makeup=1[md]",
        "-map", "[md]", "-ar", "48000", "-ac", "2", out)
     manifest_add(a.work, "bgm", out, f"配乐－{os.path.splitext(os.path.basename(a.music))[0]}（避让人声）")
+    json.dump({"music": os.path.abspath(a.music), "gain": a.gain, "dur": a.dur}, open(os.path.join(a.work, "mix.json"), "w"))  # recut.py 重混用
     r = subprocess.run(["ffmpeg", "-nostats", "-i", out, "-af", "ebur128", "-f", "null", "-"], capture_output=True, text=True, encoding="utf-8")
     li = re.findall(r"I:\s+(-?[\d.]+) LUFS", r.stderr)
     print(f"bgm.wav {dur:.1f}s，响度 {li[-1] if li else '?'} LUFS（人声 −16，配乐建议 −29 到 −33）")

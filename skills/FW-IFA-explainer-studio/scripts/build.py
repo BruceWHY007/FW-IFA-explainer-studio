@@ -178,6 +178,17 @@ def main():
     rel = lambda p: p if os.path.isabs(p) else os.path.join(pdir, p)
     plan["_captions"] = json.load(open(rel(plan["captions"]), encoding="utf-8")) if plan.get("captions") else []
     plan["_cuts"] = json.load(open(rel(plan["cuts"]), encoding="utf-8")) if plan.get("cuts") else []
+    # 重说接点（prep.py cut 写的 joins.json，和 cuts.json 在一起）：离镜头边界 0.3 秒以内，就把镜头边界挪到接点上，
+    # 让镜头切换本身遮住接点；不然切换后两三帧画面又跳一下，看起来就是「卡了一下」。
+    # 落在人物段中间的接点不用管：跳切推近会在接点换一次景别（1.0／1.08），这是口播剪辑遮接点的常规做法
+    jp = os.path.join(os.path.dirname(rel(plan["cuts"])), "joins.json") if plan.get("cuts") else ""
+    joins = json.load(open(jp)) if jp and os.path.exists(jp) else []
+    segs = plan["segments"]
+    for t in [j["t"] for j in joins if j.get("kind") == "retake"]:
+        for k in range(1, len(segs)):
+            edge = segs[k]["start"]
+            if isinstance(edge, (int, float)) and 0 < abs(edge - t) <= 0.3:
+                segs[k]["start"] = segs[k - 1]["end"] = round(t, 3)
     plan["_chartimes"] = json.load(open(rel(plan["chartimes"]), encoding="utf-8")) if plan.get("chartimes") and os.path.exists(rel(plan["chartimes"])) else []
     assets = json.load(open(a.assets, encoding="utf-8"))
     geom = json.load(open(a.geom, encoding="utf-8"))

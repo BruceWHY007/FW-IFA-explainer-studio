@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """自检：不用任何真人视频，生成占位素材（灰色人形剪影、渐变横条、配图），按 examples/demo 的分镜表把五套风格各构建一遍，
-有 OpenMotion 时再跑 lint 和抽帧。装完环境、改完代码都可以跑它确认链路通。
+有 OpenMotion 时再跑 lint、完整检查和抽帧；另外用占位句子测找重说的判定规则和重剪时的时间搬移。装完环境、改完代码都可以跑它确认链路通。
 
 用法：python selftest.py [--style tanjin] [--out 目录] [--snapshot]
   不写 --style 就五套都跑；--snapshot 抽 8 帧拼成总览图（每套约 30 秒）。
@@ -82,6 +82,42 @@ def make_media(A):
     return {"video": "aroll.mp4", "width": 1080, "height": 1920, "duration": DUR, "step": 0.5, "backend": "synthetic", "frames": frames}
 
 
+def logic_checks():
+    """不用音频的两项：找重说的判定规则（占位句子）、重剪时分镜表时间怎么搬。返回 (通过数, 总数, 没通过的说明)。"""
+    import edl
+    from recut import mapper
+    t = 0.0
+    def isl(text, d):
+        nonlocal t
+        n = edl.norm(text)
+        x = {"a": t, "b": t + d, "text": text, "n": n, "k": edl.key(n), "chars": []}
+        t += d + 0.5
+        return x
+    cases = [  # (前一段, 时长, 后一段, 应该：None 不算重说／(类型, 剪不剪))
+        ("这笔钱放在房", 0.8, "这笔钱放在存款里", ("改口", True)),
+        ("先看利率再看期限", 1.6, "再看期限和条件", ("尾头重复", True)),
+        ("想赌他下个月", 1.2, "想堵它下个月反弹", ("改口", True)),   # 同音错字：他／它、赌／堵
+        ("比如说房子", 1.0, "比如说黄金", ("改口", False)),           # 排比，不剪
+        ("今天我们聊聊黄金", 1.5, "先说结论", None),
+    ]
+    ok, bad = 0, []
+    for a_, d, b_, want in cases:
+        A, B = isl(a_, d), isl(b_, 1.5)
+        hits = edl.find_retakes([A, B])
+        got = (hits[0]["kind"], hits[0]["cut"]) if hits else None
+        if got == want:
+            ok += 1
+        else:
+            bad.append(f"「{a_}」→「{b_}」应该 {want}，实际 {got}")
+    f, ot, nt = mapper([[0, 5], [6, 10]], [[0, 5], [7, 10]])
+    for v, want in ((2, 2.0), (5.5, 5.0), (8, 7.0), (9.5, 8.5)):  # 落进新剪掉那段的贴到下一段开头；落版跟着片尾平移
+        if abs(f(v) - want) < 1e-6:
+            ok += 1
+        else:
+            bad.append(f"时间搬移 {v} 应该到 {want}，实际 {f(v)}")
+    return ok, len(cases) + 4, bad
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--style", choices=STYLES)
@@ -93,6 +129,8 @@ def main():
     A = os.path.join(OUT, "assets")
     os.makedirs(A, exist_ok=True)
     print(f"自检目录：{OUT}")
+    lk_ok, lk_n, lk_bad = logic_checks()
+    print(f"[剪辑逻辑] 找重说判定和重剪时间搬移：{lk_ok}/{lk_n} 通过" + "".join("\n  ✗ " + b for b in lk_bad))
     geom = make_media(os.path.join(A, "demo"))
     json.dump(geom, open(os.path.join(OUT, "geom.json"), "w"))
     for sub, src in (("fonts", os.path.join(ROOT, "assets", "fonts")), ("tex", os.path.join(ROOT, "assets", "textures"))):
@@ -175,6 +213,9 @@ def main():
     print()
     for st, okb, line, lint in results:
         print(f"[{st}] 构建：{'✓' if okb else '✗'} {line}\n         检查：{lint}")
+    print(f"[剪辑逻辑] {lk_ok}/{lk_n} 通过")
+    if lk_bad:
+        sys.exit("剪辑逻辑自检没通过，见上面")
     if not all(r[1] for r in results):
         sys.exit("有风格构建失败，见上面的错误")
 

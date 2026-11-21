@@ -25,6 +25,8 @@
 
 导入清单 `import.json` 由 `prep.py` 各步骤自动累积，格式：`[{"key", "path", "name", "license"}]`。
 
+剪辑表和重剪不走 OpenMotion，见 [07-重说与口误.md](07-重说与口误.md)：`edl.py` 找重说、出剪辑表（`--scan` 只查不剪），`recut.py` 改了剪辑表以后一条命令重跑到检查。两者都要 whisper-cli 和 `~/.cache/whisper-cpp/` 下的模型（Windows 上 IFA口播成片 的 setup.py 把 whisper-cli 放在 `~/.cache/ifa-koubo/bin/`，edl.py 会去那里找；也可以设环境变量 `WHISPER_MODEL` 指定模型）。
+
 ## 安装
 
 基础是 OpenMotion：GitHub https://github.com/nexu-io/openmotion ，npm 发布版安装说明 https://github.com/nexu-io/openmotion/blob/main/docs/install.md ，版本和校验值 https://releases.open-design.ai/motion 。
