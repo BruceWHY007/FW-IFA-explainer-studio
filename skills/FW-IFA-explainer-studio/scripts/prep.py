@@ -179,7 +179,7 @@ def cmd_captions(a):
     t = json.load(open(a.transcript, encoding="utf-8"))
     ss = t["sentences"] if isinstance(t, dict) else t
     fix = json.load(open(a.fix, encoding="utf-8")) if a.fix else {}
-    drop = set(fix.get("drop", []))
+    drop = set(fix.get("drop", [])) | {i for i, s_ in enumerate(ss) if s_.get("drop")}  # edl.py 判成重说的整句也带 drop
     offs, acc = [], 0.0
     for x, y in edl:
         offs.append((x, y, acc)); acc += y - x

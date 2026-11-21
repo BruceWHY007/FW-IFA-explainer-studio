@@ -165,11 +165,6 @@ def main():
                 if cr.returncode:
                     ok_build = False
                     lint += "\n" + "\n".join(cr.stdout.strip().splitlines()[1:6])
-                if pn == "demo" and st == (a.style or STYLES[0]):
-                    cv = subprocess.run([sys.executable, os.path.join(HERE, "cover.py"), pp, "--assets", os.path.join(OUT, "assets.json"),
-                                         "--geom", os.path.join(OUT, "geom.json"), "--stage", d, "--video", os.path.join(A, "demo", "aroll.mp4"),
-                                         "--out", os.path.join(OUT, "cover")], capture_output=True, text=True, encoding="utf-8")
-                    lint += "；封面 " + ("✓ " + os.path.join(OUT, "cover") if cv.returncode == 0 else "✗ " + (cv.stdout + cv.stderr)[-300:])
                 if a.snapshot and lr.returncode == 0:
                     sd = os.path.join(OUT, f"snap_{tag}")
                     ats = "2.5,6.5,12.5,17.5,24,29,33.8,39" if pn == "demo" else "3.2,8.8,14.5,18.6,25.2,31.0,36.8,41.5"

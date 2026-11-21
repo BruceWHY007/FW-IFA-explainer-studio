@@ -2,7 +2,7 @@
 """全片骨架：图解段背景、母题纹样、底座（章节进度条＋补充信息卡＋署名牌）、字幕层、音效、index.html。
 五套风格共用这一份结构，只换 CSS。"""
 import json, os
-from .core import W, H, HOST_H, CAP_Y, ZOOM, esc, icon, stamp_ids, drift
+from .core import W, H, HOST_H, CAP_Y, ZOOM, esc, fit_fs, icon, stamp_ids, drift
 
 STYLE_SFX_VOL = {"soft": 0.55, "snap": 0.5, "swoosh": 0.45, "whoosh": 0.45, "impact": 0.5, "click": 0.5}
 SFX_FILES = {
@@ -119,12 +119,13 @@ def dock(film):
             script += f'tl.to("#dk-on{k - 1}",{{opacity:0.55,duration:0.35}},{t0 + 0.05:.2f});\n'
     ups = ""
     for i, u in enumerate(p.get("updates", [])):
-        stats = "".join(
-            f'<div class="st"><div class="sl">{esc(s[0])}</div><div class="sv {s[2] if len(s) > 2 else ""}">{esc(s[1])}</div></div>'
+        from .core import tw as _tw
+        stats = "".join(  # 数字按框宽自动缩字号（框宽 136px）
+            f'<div class="st"><div class="sl">{esc(s[0])}</div><div class="sv {s[2] if len(s) > 2 else ""}" style="font-size:{min(44, int(118 / max(1.0, _tw(s[1]))))}px">{esc(s[1])}</div></div>'
             for s in u.get("stats", [])[:2])
         ups += (f'<div id="dk-up{i}" class="upd" data-layout-allow-overlap><div class="lab"><span class="dot"></span>{esc(u.get("label", "最新进展"))}'
                 f'<small>{esc(u.get("label_en", "LATEST"))}</small></div>'
-                f'<div class="ti">{esc(u["title"])}</div><div class="nt">{esc(u.get("note", ""))}</div><div class="sts">{stats}</div></div>')
+                f'<div class="ti" style="font-size:{min(44, fit_fs(u["title"], 950 - 150 * len(u.get("stats", [])[:2]) - (20 if u.get("stats") else 0), 44))}px">{esc(u["title"])}</div><div class="nt">{esc(u.get("note", ""))}</div><div class="sts">{stats}</div></div>')
         a0, a1 = float(u["start"]), float(u["end"])
         script += (f'tl.to("#dk-chap",{{opacity:0,duration:0.25}},{a0:.2f});\n'
                    f'tl.fromTo("#dk-up{i}",{{opacity:0,y:40}},{{opacity:1,y:0,duration:0.4,ease:"back.out(1.5)"}},{a0:.2f});\n'

@@ -42,8 +42,12 @@ class Seg:
         return self.end - self.start
 
     def L(self, t):
-        """全片时间 → 本段局部时间。"""
-        return round(float(t) - self.start, 3)
+        """全片时间 → 本段局部时间。数字时间一律按整片时间写；落在本段之外多半是按段内时间写错了，直接报错。"""
+        v = round(float(t) - self.start, 3)
+        if v < -0.3 or v > self.d + 0.3:
+            raise BuildError(f"{self.id} 里的时间 {t} 不在这一段（{self.start:.2f}–{self.end:.2f} 秒）里：分镜表里的数字时间按整片时间写，"
+                             f"不是段内秒数；或者改成 \"@关键词\"")
+        return v
 
     def times(self, items, key="t", first=0.4, last_pad=0.6, gap=0.6):
         """列表项的出现时间（局部秒）。没写 t 的按段长均分。"""
@@ -73,6 +77,7 @@ class Seg:
 class Film:
     def __init__(self, plan, assets, geom, out):
         from . import styles
+        self.head_shift = {}
         self.plan = plan
         self.A = assets
         self.geom = geom
@@ -94,7 +99,10 @@ class Film:
     # ------------------------------------------------------------ 说话时间（让动画对齐本人说话）
     def _speech_index(self):
         if not hasattr(self, "_ct"):
-            ct = self.plan.get("_chartimes") or []
+            ct = []
+            for c in self.plan.get("_chartimes") or []:  # 多字一项（英文词、数字）拆成单字，索引才对得上
+                for ch in str(c[0]):
+                    ct.append([ch, c[1], c[2]])
             self._ct = ("".join(c[0] for c in ct).lower(), ct)
         return self._ct
 
@@ -179,6 +187,9 @@ class Film:
                 f".EN,.head p{{color:{c} !important}}.badge2{{border-color:{c} !important}}")
 
     def scene(self, cid, body, script, css=""):
+        hs = self.head_shift.get(cid)
+        if hs:  # put_pip 发现小窗压标题时记下的挪位：标题区收窄到小窗另一侧
+            body = body.replace(f'id="{cid}-head" class="head" style="', f'id="{cid}-head" class="head" style="{hs[0]}:{hs[1]:.0f}px;', 1)
         html = f"""<template>
 <style>{self.base_css()}{self.st.css}{self.tone_css()}{css}</style>
 <div id="root" data-composition-id="{cid}" data-width="1080" data-height="1920">

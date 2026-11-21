@@ -153,22 +153,33 @@ def cmd_import(a):
     items = json.load(open(a.manifest, encoding="utf-8"))
     amap_p = os.path.join(a.work, "assets.json")
     amap = json.load(open(amap_p, encoding="utf-8")) if os.path.exists(amap_p) else {}
-    todo = [it for it in items if it["key"] not in amap or a.force]
+    fp_p = os.path.join(a.work, "assets_src.json")  # 每个键导入时源文件的指纹：重剪、重混后同名文件变了要重新导入
+    fps = json.load(open(fp_p, encoding="utf-8")) if os.path.exists(fp_p) else {}
+    fp = lambda pth: [os.path.abspath(pth), os.path.getsize(pth), int(os.path.getmtime(pth))]
+    todo = [it for it in items if a.force or it["key"] not in amap or fps.get(it["key"]) != fp(it["path"])]
+    if todo and any(it["key"] in amap for it in todo):
+        print("源文件变了，重新导入：" + "、".join(it["key"] for it in todo if it["key"] in amap))
     for i in range(0, len(todo), 40):
         batch = []
         for it in todo[i:i + 40]:
-            x = {"itemId": it["key"], "sourcePath": os.path.abspath(it["path"]), "name": it.get("name", it["key"])}
+            f_ = fp(it["path"])  # 编号带上文件指纹：OpenMotion 同一个编号不会替换文件，源文件变了要换编号才会导入新文件
+            x = {"itemId": f'{it["key"]}--{f_[1]}-{f_[2]}', "sourcePath": os.path.abspath(it["path"]), "name": it.get("name", it["key"])}
             if it.get("license"):
                 x["licensePath"] = os.path.abspath(it["license"])
             batch.append(x)
         r = call("openmotion_import_assets", {"projectId": st["projectId"], "requestId": rid("import"), "items": batch})
         for x in r.get("items", []):
+            key_ = x.get("itemId", "").split("--")[0]
             if x.get("status") == "completed":
-                amap[x["itemId"]] = x["path"]
+                amap[key_] = x["path"]
+                src_ = next((it["path"] for it in todo if it["key"] == key_), None)
+                if src_:
+                    fps[key_] = fp(src_)
             else:
                 print(f"✗ {x.get('itemId')}: {x.get('status')} {x.get('error', '')}", file=sys.stderr)
         json.dump(amap, open(amap_p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print(f"assets.json：{len(amap)} 项")
+        json.dump(fps, open(fp_p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print(f"assets.json：{len(amap)} 项（这次导入 {len(todo)} 项）")
 
 
 def cmd_save(a):

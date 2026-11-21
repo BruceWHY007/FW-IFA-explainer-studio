@@ -155,7 +155,7 @@ def registry_check(film, reg):
     acc = film.plan.get("account")
     if not acc or acc not in reg:
         return []
-    last = reg[acc][-3:]
+    last = [r for r in reg[acc] if r.get("title") != film.title][-3:]  # 同一支片子重剪、重导不算重复
     w = []
     gs = [s.layout for s in film.segs if s.kind == "graphic"]
     for r in last:
@@ -248,7 +248,8 @@ def main():
     if errors or (a.strict and warns):
         sys.exit(f"构建未通过：{len(errors)} 个错误、{len(warns)} 个警告（见 {a.out}/build_report.json）")
     if a.register and plan.get("account"):
-        reg.setdefault(plan["account"], []).append({"title": film.title, "style": film.st.key, "accent": film.st.acc_key, "motif": film.motif,
+        reg[plan["account"]] = [r for r in reg.get(plan["account"], []) if r.get("title") != film.title]  # 同名片子只留最新一版
+        reg[plan["account"]].append({"title": film.title, "style": film.st.key, "accent": film.st.acc_key, "motif": film.motif,
                                                      "graphic": [s.layout for s in film.segs if s.kind == "graphic"]})
         json.dump(reg, open(reg_p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     n = len(os.listdir(os.path.join(a.out, "compositions")))

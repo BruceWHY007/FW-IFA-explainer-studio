@@ -14,6 +14,7 @@ NOTE = "示意 · ILLUSTRATIVE"
 # ---------------------------------------------------------------- 公共件
 def header(film, seg, zh, en, top=170, fs=None):
     fs = fs or (84 if tw(zh) <= 9 else fit_fs(zh, 960, 76, 48))
+    seg.header_box = (540 - tw(zh) * fs / 2 - 20, top, tw(zh) * fs + 40, fs * 1.1 + 70)
     return (f'<div id="{seg.id}-head" class="head" style="top:{top}px"><div class="orn"><i></i><s></s><i class="r"></i></div>'
             f'<h2 style="font-size:{fs}px">{rich(zh)}</h2><p>{rich(en)}</p></div>')
 
@@ -35,6 +36,13 @@ def put_pip(film, seg, spec, t=0.25, amp=9):
     if not spec:
         return "", ""
     shape, x, y, w, h = spec
+    hb = getattr(seg, "header_box", None)
+    if hb and x < hb[0] + hb[2] and x + w > hb[0] and y < hb[1] + hb[3] and y + h > hb[1]:
+        room = (x - 20 - 40) if x + w / 2 > W / 2 else (W - 40 - (x + w + 20))
+        if hb[2] <= room:  # 标题挪到小窗另一侧那块空地里居中
+            film.head_shift[seg.id] = ("right", W - x + 20) if x + w / 2 > W / 2 else ("left", x + w + 20)
+        else:
+            y = hb[1] + hb[3] + 14  # 放不下：小窗挪到标题下面
     seg.pip_rect = (x, y - amp, w, h + 2 * amp)
     return pip(film, seg, shape, x, y, w, h), pip_in(seg, t) + floaty(f"#{seg.id}-pipwf", seg.d, amp, 3.6, 0.0)
 
@@ -391,7 +399,7 @@ def _chain_list(film, seg):
         hh = gap - 26
         plates += (f'<div id="{seg.id}-p{k}" class="card" style="left:66px;top:{y}px;width:560px;height:{hh}px">{ih}<div class="dash"></div><div id="{seg.id}-p{k}-g" class="glow"></div>'
                    f'<div class="ab k" style="left:26px;top:{hh / 2 - 56:.0f}px">{k + 1}</div>'
-                   f'<div class="ab t" style="left:110px;top:{hh / 2 - 34:.0f}px;font-size:{min(54, fit_fs(it["zh"], 330, 54))}px;white-space:nowrap">{rich(it["zh"])}</div>'
+                   f'<div class="ab t" style="left:110px;top:{hh / 2 - 34:.0f}px;font-size:{min(54, fit_fs(it["zh"], 230 if img else 420, 54))}px;white-space:nowrap">{rich(it["zh"])}</div>'
                    f'<div class="ab e" style="left:112px;top:{hh / 2 + 32:.0f}px;margin:0">{rich(it.get("en", ""))}</div></div>')
     arrows = "".join(f'<path d="M {640 if k % 2 == 0 else 46} {top0 + (gap - 26) / 2 + k * gap:.0f} q {40 if k % 2 == 0 else -40} {gap / 2:.0f} 0 {gap}" fill="none" stroke="{st.c["a"]}" stroke-opacity=".6" stroke-width="3" stroke-dasharray="8 10"/>' for k in range(n - 1))
     ph_ = top0 + n * gap + 50
@@ -420,9 +428,13 @@ def _chain_list(film, seg):
         film.sfx_at(seg, t, "snap")
     if d.get("stamp"):
         sp = d["stamp"]
-        sx = 520 if mirror else 420
-        body += (f'<div id="{seg.id}-stamp" class="ab TR" style="left:{sx - (440 if mirror else 0)}px;top:880px;font-size:210px;letter-spacing:6px;opacity:0">{rich(sp["text"])}</div>'
-                 f'<div id="{seg.id}-stampen" class="ab EN" style="left:{sx + 50 - (440 if mirror else 0)}px;top:1110px;color:#FF8A80;letter-spacing:8px;opacity:0">{rich(sp.get("en", ""))}</div>')
+        # 印章放在面板下方、小窗的另一侧，不压条目和小窗
+        sfs = min(170, fit_fs(sp["text"], 600, 170))
+        swd = tw(sp["text"]) * sfs + 6 * len(plain(sp["text"]))
+        sy = min(140 + ph_ + 20, HOST_H - sfs - 150)
+        sx = 60 if mirror else W - 60 - swd
+        body += (f'<div id="{seg.id}-stamp" class="ab TR" style="left:{sx:.0f}px;top:{sy:.0f}px;font-size:{sfs}px;letter-spacing:6px;white-space:nowrap;opacity:0">{rich(sp["text"])}</div>'
+                 f'<div id="{seg.id}-stampen" class="ab EN" style="left:{sx + 10:.0f}px;top:{sy + sfs * 1.1:.0f}px;color:#FF8A80;letter-spacing:8px;opacity:0">{rich(sp.get("en", ""))}</div>')
         stt = seg.at_t(sp, seg.d - 1.5)
         s += st.stamp_in(f"#{seg.id}-stamp", stt) + f'tl.fromTo("#{seg.id}-stampen",{{opacity:0}},{{opacity:1,duration:0.3}},{stt + 0.35:.3f});\n'
         film.sfx_at(seg, stt, "impact")
@@ -636,15 +648,29 @@ def quote(film, seg):
     big_cls = "TB" if mode == "brush" else d.get("cls1", "T1")
     rv = d.get("reveal") == "chars"
     fs1 = d.get("fs1") or min(190 if mode == "brush" else 150, fit_fs(d["big1"], 980, 190 if mode == "brush" else 150))
+    yb = {1: y_big, 2: y_big}
+    if mode == "banner":  # 光带高 240：两行大字缩字号，并在光带里上下居中
+        for k_, key_ in ((1, "big1"), (2, "big2")):
+            txt_ = d.get(key_) or ""
+            nl_ = txt_.count("|") + 1
+            if not txt_:
+                continue
+            cap_ = int(200 / (nl_ * 1.05))
+            if k_ == 1 and not d.get("fs1"):
+                fs1 = min(fs1, cap_)
+            fsk = fs1 if k_ == 1 else (d.get("fs2") or min(cap_, fit_fs(txt_, 980, 170)))
+            if k_ == 2:
+                d["fs2"] = fsk
+            yb[k_] = 950 + (240 - nl_ * fsk * 1.05) / 2
     body += (f'<div id="{seg.id}-lab1" data-layout-allow-overlap class="head" style="top:{y_lab}px"><h2 style="font-size:{56 if mode != "banner" else 48}px">{rich(d.get("lab1", ""))}</h2><p>{rich(d.get("en1", ""))}</p></div>'
-             f'<div id="{seg.id}-big1" data-layout-allow-overlap class="ab {"" if rv else big_cls}" style="left:0;right:0;top:{y_big}px;text-align:center;font-size:{fs1}px;line-height:1.05;letter-spacing:{10 if mode == "brush" else 6}px;opacity:0">{chars(d["big1"], big_cls) if rv else rich(d["big1"])}</div>')
+             f'<div id="{seg.id}-big1" data-layout-allow-overlap class="ab {"" if rv else big_cls}" style="left:0;right:0;top:{yb[1]:.0f}px;text-align:center;font-size:{fs1}px;line-height:1.05;letter-spacing:{10 if mode == "brush" else 6}px;opacity:0">{chars(d["big1"], big_cls) if rv else rich(d["big1"])}</div>')
     if not d.get("lab1"):
         body = body.replace(f'<div id="{seg.id}-lab1" class="head"', f'<div id="{seg.id}-lab1" data-layout-allow-overlap class="head" data-empty="1"', 1)
     if d.get("big2"):
         fs2 = d.get("fs2") or min(190 if mode == "brush" else 170, fit_fs(d["big2"], 980, 190 if mode == "brush" else 170))
         cls2 = "TB" if mode == "brush" else d.get("cls2", "T2")
         body += (f'<div id="{seg.id}-lab2" data-layout-allow-overlap class="head" style="top:{y_lab}px;opacity:0"><h2 style="font-size:{56 if mode != "banner" else 48}px">{rich(d.get("lab2", ""))}</h2><p>{rich(d.get("en2", ""))}</p></div>'
-                 f'<div id="{seg.id}-big2" data-layout-allow-overlap class="ab {"" if rv else cls2}" style="left:0;right:0;top:{y_big}px;text-align:center;font-size:{fs2}px;line-height:1.05;letter-spacing:6px;opacity:0">{chars(d["big2"], cls2) if rv else rich(d["big2"])}</div>')
+                 f'<div id="{seg.id}-big2" data-layout-allow-overlap class="ab {"" if rv else cls2}" style="left:0;right:0;top:{yb[2]:.0f}px;text-align:center;font-size:{fs2}px;line-height:1.05;letter-spacing:6px;opacity:0">{chars(d["big2"], cls2) if rv else rich(d["big2"])}</div>')
     s += f'tl.fromTo("#{seg.id}-lab1",{{opacity:0,y:20}},{{opacity:1,y:0,duration:0.4,ease:"power3.out"}},0.05);\n'
     if rv:
         s += chars_in(f"#{seg.id}-big1", t1, len(plain(d["big1"])), d.get("per") or film.reveal_per(d["big1"], seg))
@@ -673,7 +699,7 @@ def chapter(film, seg):
     d = seg.data
     st = film.st
     mode = d.get("mode", st.chapter)
-    t = seg.at("t", 0.2)
+    t = min(seg.at("t", 0.2), max(0.2, seg.d * 0.25))  # 章节卡是段落开头，标题要先出来；关键词常在句尾，不能等
     rng = film.rng(seg)
     body, s = graphic_bg(film, seg, pattern=False)
     zh = d["zh"]
@@ -814,7 +840,7 @@ def doc(film, seg):
     lines = "".join(f'<div style="font:400 34px/1.7 SR,serif;color:#3A3530">{rich(l)}</div>' for l in d.get("lines", []))
     fs = min(68, fit_fs(hl, 900, 68))
     body = bg + (f'<div id="{seg.id}-pf" class="fl" data-layout-allow-overflow style="left:-40px;top:300px;width:1160px;height:820px">'
-                 f'<div id="{seg.id}-pp" class="paper" style="left:0;top:0;width:1160px;height:820px;padding:90px 110px;isolation:isolate">'
+                 f'<div id="{seg.id}-pp" class="paper" data-layout-allow-overlap style="left:0;top:0;width:1160px;height:820px;padding:90px 110px;isolation:isolate">'
                  f'<div style="font:600 22px/1 EN,Inter;letter-spacing:3px;color:#9A8F80;margin-bottom:40px">{rich(d.get("source", ""))}</div>'
                  f'<div style="font:400 {fs}px/1.3 SM;color:#16120E;position:relative;z-index:1">{hl_html}</div>'
                  f'<div style="height:2px;background:rgba(0,0,0,.12);margin:40px 0"></div>{lines}</div></div>')
