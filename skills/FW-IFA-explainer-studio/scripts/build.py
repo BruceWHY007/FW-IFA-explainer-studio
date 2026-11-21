@@ -22,6 +22,57 @@ from tujie.layouts_graphic import GRAPHIC_LAYOUTS  # noqa: E402
 
 LIMITS = {"band": 4, "quote": 3, "chapter": 4, "ending": 1}
 DEFAULT_LIMIT = 2
+PARA_KEYS = ("tone", "energy", "enter", "card_enter", "reveal")
+BAD_WORDS = ("风险", "亏", "跌", "泡沫", "危机", "破产", "陷阱", "损失", "警惕", "暴雷", "爆雷", "贵", "坑", "崩", "代价")
+GOOD_WORDS = ("增长", "涨", "赚", "收益", "机会", "利好", "回报", "翻倍", "红利", "上升")
+HEADLINE_FIELDS = ("word", "big1", "big2", "zh", "text")
+
+
+def texts(v, keys=None):
+    out = []
+    if isinstance(v, str):
+        out.append(v)
+    elif isinstance(v, dict):
+        for k, x in v.items():
+            if keys is None or k in keys or isinstance(x, (dict, list)):
+                out += texts(x, keys)
+    elif isinstance(v, list):
+        for x in v:
+            out += texts(x, keys)
+    return out
+
+
+def auto_params(seg, state):
+    """分镜表没写段落层参数时，按这一段的文字自动推断，让同风格的片子各段表现不一样。写了的参数优先。
+    克制：只动图解段；「有力＋放大冲击」全片最多 2 次、不相邻，否则会变成新的千篇一律。"""
+    d = seg.data
+    got = []
+    state["idx"] += 1
+    if seg.kind != "graphic":
+        return got
+    heads = " ".join(texts(d, HEADLINE_FIELDS + ("title", "lines", "spans", "intro")))
+    if ("energy" not in d and "enter" not in d and ("？" in heads or "?" in heads)
+            and state["punch"] < 2 and state["idx"] - state["last"] >= 3 and seg.layout not in ("chapter", "ending")):
+        d["energy"], d["enter"] = "punch", "zoom"
+        state["punch"] += 1
+        state["last"] = state["idx"]
+        got.append("问句→有力＋放大冲击")
+    if "tone" not in d:
+        ts = texts(d)
+        bad = any(w in t for t in ts for w in BAD_WORDS)
+        good = any(w in t for t in ts if "？" not in t and "?" not in t for w in GOOD_WORDS)
+        if bad != good:
+            d["tone"] = "bad" if bad else "good"
+            got.append(f"{'风险词→红' if bad else '增长词→绿'}")
+    if "reveal" not in d and seg.layout in ("quote", "ending"):
+        big = d.get("big1", "") + d.get("big2", "")
+        if big and len(big.replace("*", "")) <= 12:
+            d["reveal"] = "chars"
+            got.append("短金句→逐字展开")
+    if seg.layout == "chapter" and "energy" not in d:
+        d["energy"] = "calm"
+        got.append("章节卡→平静")
+    return got
 
 
 def overlap(a, b):
@@ -40,6 +91,12 @@ def variety(film):
     for k, n in cnt.items():
         if n > LIMITS.get(k, DEFAULT_LIMIT):
             warns.append(f"{k} 用了 {n} 次（上限 {LIMITS.get(k, DEFAULT_LIMIT)}）")
+    seen = {}
+    for s_ in gs:
+        key = (s_.layout,) + tuple(s_.data.get(k) for k in PARA_KEYS)
+        if key in seen:
+            warns.append(f"{seen[key]} 和 {s_.id} 版式相同、段落层参数也相同，动起来会一模一样：换入场、色调或节奏")
+        seen.setdefault(key, s_.id)
     sig = set(film.st.signature)
     if gs and not sig & set(cnt):
         warns.append(f"没用本风格（{film.st.name}）的招牌版式：{'、'.join(sorted(sig))}")
@@ -83,7 +140,16 @@ def main():
     film = Film(plan, assets, geom, a.out)
     film.st.bind(film)
     errors = []
+    auto_log = {}
+    explicit = sum(1 for s in film.segs if s.kind == "graphic" and (any(k in s.data for k in PARA_KEYS) or "*" in json.dumps(s.data, ensure_ascii=False)))
+    if not plan.get("no_auto"):
+        state = {"punch": 0, "last": -9, "idx": -1}
+        for s in film.segs:
+            got = auto_params(s, state)
+            if got:
+                auto_log[s.id] = got
     for s in film.segs:
+        film.prepare(s)
         fn = (HOST_LAYOUTS if s.kind == "host" else GRAPHIC_LAYOUTS).get(s.layout)
         if not fn:
             errors.append(f"{s.id}：没有版式 {s.layout}（人物段可用 {', '.join(HOST_LAYOUTS)}；图解段可用 {', '.join(GRAPHIC_LAYOUTS)}）")
@@ -96,6 +162,7 @@ def main():
             errors.append(f"{s.id}（{s.layout}）：data 缺字段 {e}")
         if s.kind == "graphic":
             film.sfx.append((max(0, s.start - 0.12), "soft", None))
+    film.prepare(None)
     # 碰脸检查
     seg_by = {s.id: s for s in film.segs}
     face_hits = []
@@ -116,14 +183,20 @@ def main():
     order.append(("captions", 0, film.dur, 9, 6, "captions"))
     frame.index(film, order)
     warns = variety(film)
+    ng = sum(1 for s in film.segs if s.kind == "graphic")
+    if ng and explicit < ng / 2:
+        warns.append(f"只有 {explicit}/{ng} 个图解段在分镜表里按内容设了段落层参数（tone／energy／enter／card_enter／reveal／*重点词*），"
+                     "其余靠自动推断；按 references/02 的「内容 → 调法」表逐段补上")
     reg_p = os.path.join(ROOT, "data", "registry.json")
     reg = json.load(open(reg_p, encoding="utf-8")) if os.path.exists(reg_p) else {}
     warns += registry_check(film, reg)
     if geom.get("estimated_head_top"):
         warns.append("人物测量用的是 OpenCV 兜底，头顶是估算值；有条件请装 mediapipe 重测")
     report = {"title": film.title, "style": film.st.key, "accent": film.st.acc_key, "segments": [(s.id, s.kind, s.layout, s.start, s.end) for s in film.segs],
-              "errors": errors, "warnings": warns, "sfx": len(film.sfx), "zones": len(film.zones)}
+              "errors": errors, "warnings": warns, "auto_params": auto_log, "sfx": len(film.sfx), "zones": len(film.zones)}
     json.dump(report, open(os.path.join(a.out, "build_report.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    for sid, got in auto_log.items():
+        print(f"·  {sid} 自动按内容调整：{'、'.join(got)}")
     for w in warns:
         print("⚠️ ", w)
     for e in errors:

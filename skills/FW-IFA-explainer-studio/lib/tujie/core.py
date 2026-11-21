@@ -11,6 +11,8 @@ W, H = 1080, 1920
 HOST_H = 1576
 CAP_Y = 1300          # 人物段字幕默认位置（字幕上沿）
 ZOOM = 1.08           # 跳切推近倍率
+MOTION = {"amp": 1.0}  # 当前段的缓动幅度倍数（段落层 energy 决定）
+TONES = {"good": "#43D69A", "bad": "#FF6A63", "warn": "#F5B83D", "info": "#6E9BFF"}
 SKILL_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
@@ -84,7 +86,15 @@ class Film:
         self.cap_slots = []
         self.warnings = []
         self.motif = plan.get("motif", [])
+        self.cur = None
         os.makedirs(os.path.join(out, "compositions"), exist_ok=True)
+
+    def prepare(self, seg):
+        """进入一段之前调用：按这一段的段落层参数（energy／enter／card_enter／tone）设置动作和色调。seg=None 时恢复默认。"""
+        self.cur = seg
+        data = seg.data if seg else {}
+        self.st.set_mode(data)
+        MOTION["amp"] = {"calm": 0.7, "punch": 1.15}.get(data.get("energy"), 1.0)
 
     # ------------------------------------------------------------ 素材
     def a(self, key):
@@ -116,9 +126,20 @@ class Film:
 .note{position:absolute;font:600 18px/1 EN,Inter,sans-serif;letter-spacing:4px;color:rgba(255,255,255,.42)}
 """
 
+    def tone_css(self):
+        """段落层 tone：这一段的点亮框、小标签、重点词、英文副题换成情绪色（好消息绿、风险红、提醒黄、说明蓝）。"""
+        tone = self.cur.data.get("tone") if self.cur else None
+        c = TONES.get(tone)
+        if not c:
+            return ""
+        return (f".glow{{border-color:{c} !important;box-shadow:0 0 0 1px {c}40,0 0 40px {c}77 !important}}"
+                f".tag{{background:linear-gradient(180deg,{c},{c}BB) !important;color:#fff !important}}"
+                f".hl{{color:{c} !important;-webkit-text-fill-color:{c} !important}}"
+                f".EN,.head p{{color:{c} !important}}.badge2{{border-color:{c} !important}}")
+
     def scene(self, cid, body, script, css=""):
         html = f"""<template>
-<style>{self.base_css()}{self.st.css}{css}</style>
+<style>{self.base_css()}{self.st.css}{self.tone_css()}{css}</style>
 <div id="root" data-composition-id="{cid}" data-width="1080" data-height="1920">
 {body}
 </div>
@@ -222,16 +243,48 @@ def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def br(s):
-    """文字里的 | 换成换行。"""
-    return esc(s).replace("|", "<br>")
+def rich(s):
+    """显示用文字：转义，| 换成换行，*重点词* 换成本风格（或本段色调）的强调色。"""
+    out = esc(s).replace("|", "<br>")
+    return re.sub(r"\*(.+?)\*", r'<span class="hl">\1</span>', out)
+
+
+br = rich
+
+
+def plain(s):
+    """去掉强调标记，用于量宽度、逐字展开。"""
+    return str(s).replace("*", "")
+
+
+def chars(text, cls):
+    """逐字展开用：每个字一个 span，渐变类挂在每个字上（父级不能再挂渐变类）。*重点词* 里的字加强调色。"""
+    parts, em = [], False
+    for ch in str(text):
+        if ch == "*":
+            em = not em
+            continue
+        if ch == "|":
+            parts.append("<br>")
+        elif ch == " ":
+            parts.append('<span class="ch" style="display:inline-block">&nbsp;</span>')
+        else:
+            parts.append(f'<span class="ch {cls}{" hl" if em else ""}" style="display:inline-block">{esc(ch)}</span>')
+    return "".join(parts)
+
+
+def chars_in(sel, t, n, per=0.06):
+    """逐字出现：每个字从下方带模糊浮上来，按字数错开。"""
+    per = max(0.03, min(0.1, per))
+    return (f'tl.set("{sel}",{{opacity:1}},{t:.3f});\n'
+            f'tl.fromTo("{sel} .ch",{{opacity:0,y:26,filter:"blur(8px)"}},{{opacity:1,y:0,filter:"blur(0px)",duration:0.36,stagger:{per:.3f},ease:"power3.out"}},{t:.3f});\n')
 
 
 def tw(s):
     """估算文字宽度（以一个汉字为 1）。"""
     w = 0.0
     for ch in str(s):
-        if ch == "|":
+        if ch in "|*":
             continue
         w += 0.55 if re.match(r"[A-Za-z0-9 .,%$+\-:/·]", ch) else 1.0
     return w
@@ -245,6 +298,7 @@ def fit_fs(text, width, fs_max, fs_min=28, ratio=1.0):
 
 def floaty(sel, dur, amp=9, period=3.6, phase=0.0, rot=0.0):
     """持续上下缓动（参考片里卡片、小窗、标签一直在轻微浮动）。"""
+    amp = round(amp * MOTION["amp"], 1)
     half = period / 2
     n = max(1, int((dur - phase) / half))
     s = f'tl.fromTo("{sel}",{{y:{-amp}}},{{y:{amp},duration:{half:.2f},ease:"sine.inOut",yoyo:true,repeat:{n}}},{phase:.2f});\n'

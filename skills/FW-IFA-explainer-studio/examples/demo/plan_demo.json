@@ -6,32 +6,274 @@
  "aroll_duration": 40,
  "captions": "captions_demo.json",
  "cuts": "cuts_demo.json",
- "caption_skip": [[0, 4]],
- "host": {"name": "主讲人", "badge": ["主讲人", "示例"]},
- "chapters": [[0, "问题"], [9, "风险"], [20, "去处"], [31, "用途"]],
- "updates": [{"start": 16.5, "end": 20, "label": "补充", "label_en": "NOTE", "title": "示例数据，仅用于自检",
-              "note": "ILLUSTRATIVE · 不代表任何产品", "stats": [["示例一", "1.0"], ["示例二", "+2%", "up"]]}],
- "motif": ["wallet", "piggy-bank", "trending-up"],
+ "caption_skip": [
+  [
+   0,
+   4
+  ]
+ ],
+ "host": {
+  "name": "主讲人",
+  "badge": [
+   "主讲人",
+   "示例"
+  ]
+ },
+ "chapters": [
+  [
+   0,
+   "问题"
+  ],
+  [
+   9,
+   "风险"
+  ],
+  [
+   20,
+   "去处"
+  ],
+  [
+   31,
+   "用途"
+  ]
+ ],
+ "updates": [
+  {
+   "start": 16.5,
+   "end": 20,
+   "label": "补充",
+   "label_en": "NOTE",
+   "title": "示例数据，仅用于自检",
+   "note": "ILLUSTRATIVE · 不代表任何产品",
+   "stats": [
+    [
+     "示例一",
+     "1.0"
+    ],
+    [
+     "示例二",
+     "+2%",
+     "up"
+    ]
+   ]
+  }
+ ],
+ "motif": [
+  "wallet",
+  "piggy-bank",
+  "trending-up"
+ ],
  "segments": [
-  {"id": "h01", "kind": "host", "layout": "title_top", "start": 0, "end": 4,
-   "data": {"lines": [{"spans": [["一笔钱", "T2"], ["三种去处", "T1"]], "t": 0.1}, {"text": "示例 · 图解口播自检", "cls": "sub", "t": 1.6}], "out": 3.8}},
-  {"id": "s02", "kind": "graphic", "layout": "bigword_band", "start": 4, "end": 9, "bg": "bg_demo",
-   "data": {"intro": {"zh": "先看一个问题", "en": "A simple question"}, "word": "放哪里", "t": 5.2, "band": "band_demo", "ticker": ["CASH", "BOND", "EQUITY"]}},
-  {"id": "s03", "kind": "graphic", "layout": "bars", "start": 9, "end": 15, "bg": "bg_demo",
-   "data": {"title": {"zh": "收益越高，波动越大？", "en": "Return vs risk"}, "values": [40, 52, 48, 66, 80, 95, 120, 150, 190],
-            "hi": [6, 8], "hi_label": "收益 ↑", "hi_t": 11.5, "bars_t": 9.4, "line": {"label": "波动？", "t": 13}, "q_t": 13.6}},
-  {"id": "h04", "kind": "host", "layout": "side_tags", "start": 15, "end": 20,
-   "data": {"left": ["保本", "Safety"], "right": ["增值", "Growth"], "tones": ["info", "accent"], "tl": 15.2, "tr": 16.4}},
-  {"id": "s05", "kind": "graphic", "layout": "chain", "start": 20, "end": 27, "bg": "bg_demo",
-   "data": {"title": {"zh": "三种去处", "en": "Three buckets"}, "items": [
-     {"zh": "现金", "en": "Cash", "img": "thumb_demo1", "t": 21.0}, {"zh": "稳健", "en": "Stable", "img": "thumb_demo2", "t": 22.6},
-     {"zh": "增长", "en": "Growth", "img": "thumb_demo3", "t": 24.2}]}},
-  {"id": "s06", "kind": "graphic", "layout": "quote", "start": 27, "end": 31,
-   "data": {"lab1": "说白了", "en1": "In short", "big1": "先分清用途", "t1": 27.4}},
-  {"id": "h07", "kind": "host", "layout": "chest_cards", "start": 31, "end": 35,
-   "data": {"cards": [{"zh": "随时要用", "tag": "现金", "en": "Anytime", "t": 31.5}, {"zh": "三五年", "tag": "稳健", "en": "3–5 years", "t": 32.6},
-                      {"zh": "十年以上", "tag": "增长", "en": "10+ years", "t": 33.7}]}},
-  {"id": "s08", "kind": "graphic", "layout": "ending", "start": 35, "end": 40,
-   "data": {"big1": "钱没有好坏", "t1": 35.4, "big2": "只有放对地方", "t2": 37.0, "t_end": 38.6, "tagline": "DEMO · SELF TEST"}}
+  {
+   "id": "h01",
+   "kind": "host",
+   "layout": "title_top",
+   "start": 0,
+   "end": 4,
+   "data": {
+    "lines": [
+     {
+      "spans": [
+       [
+        "一笔钱",
+        "T2"
+       ],
+       [
+        "三种去处",
+        "T1"
+       ]
+      ],
+      "t": 0.1
+     },
+     {
+      "text": "示例 · 图解口播自检",
+      "cls": "sub",
+      "t": 1.6
+     }
+    ],
+    "out": 3.8
+   }
+  },
+  {
+   "id": "s02",
+   "kind": "graphic",
+   "layout": "bigword_band",
+   "start": 4,
+   "end": 9,
+   "bg": "bg_demo",
+   "data": {
+    "intro": {
+     "zh": "先看一个问题",
+     "en": "A simple question"
+    },
+    "word": "放*哪里*",
+    "t": 5.2,
+    "band": "band_demo",
+    "ticker": [
+     "CASH",
+     "BOND",
+     "EQUITY"
+    ],
+    "energy": "punch",
+    "enter": "zoom"
+   }
+  },
+  {
+   "id": "s03",
+   "kind": "graphic",
+   "layout": "bars",
+   "start": 9,
+   "end": 15,
+   "bg": "bg_demo",
+   "data": {
+    "title": {
+     "zh": "收益越高，*波动*越大？",
+     "en": "Return vs risk"
+    },
+    "values": [
+     40,
+     52,
+     48,
+     66,
+     80,
+     95,
+     120,
+     150,
+     190
+    ],
+    "hi": [
+     6,
+     8
+    ],
+    "hi_label": "收益 ↑",
+    "hi_t": 11.5,
+    "bars_t": 9.4,
+    "line": {
+     "label": "波动？",
+     "t": 13
+    },
+    "q_t": 13.6,
+    "tone": "warn"
+   }
+  },
+  {
+   "id": "h04",
+   "kind": "host",
+   "layout": "side_tags",
+   "start": 15,
+   "end": 20,
+   "data": {
+    "left": [
+     "保本",
+     "Safety"
+    ],
+    "right": [
+     "增值",
+     "Growth"
+    ],
+    "tones": [
+     "info",
+     "accent"
+    ],
+    "tl": 15.2,
+    "tr": 16.4
+   }
+  },
+  {
+   "id": "s05",
+   "kind": "graphic",
+   "layout": "chain",
+   "start": 20,
+   "end": 27,
+   "bg": "bg_demo",
+   "data": {
+    "title": {
+     "zh": "三种去处",
+     "en": "Three buckets"
+    },
+    "items": [
+     {
+      "zh": "现金",
+      "en": "Cash",
+      "img": "thumb_demo1",
+      "t": 21.0
+     },
+     {
+      "zh": "稳健",
+      "en": "Stable",
+      "img": "thumb_demo2",
+      "t": 22.6
+     },
+     {
+      "zh": "*增长*",
+      "en": "Growth",
+      "img": "thumb_demo3",
+      "t": 24.2
+     }
+    ],
+    "card_enter": "toss"
+   }
+  },
+  {
+   "id": "s06",
+   "kind": "graphic",
+   "layout": "quote",
+   "start": 27,
+   "end": 31,
+   "data": {
+    "lab1": "说白了",
+    "en1": "In short",
+    "big1": "先分清*用途*",
+    "t1": 27.4
+   }
+  },
+  {
+   "id": "h07",
+   "kind": "host",
+   "layout": "chest_cards",
+   "start": 31,
+   "end": 35,
+   "data": {
+    "cards": [
+     {
+      "zh": "随时要用",
+      "tag": "现金",
+      "en": "Anytime",
+      "t": 31.5
+     },
+     {
+      "zh": "三五年",
+      "tag": "稳健",
+      "en": "3–5 years",
+      "t": 32.6
+     },
+     {
+      "zh": "十年以上",
+      "tag": "增长",
+      "en": "10+ years",
+      "t": 33.7
+     }
+    ],
+    "tone": "info"
+   }
+  },
+  {
+   "id": "s08",
+   "kind": "graphic",
+   "layout": "ending",
+   "start": 35,
+   "end": 40,
+   "data": {
+    "big1": "钱没有好坏",
+    "t1": 35.4,
+    "big2": "只有放对地方",
+    "t2": 37.0,
+    "t_end": 38.6,
+    "tagline": "DEMO · SELF TEST"
+   }
+  }
+ ],
+ "keywords": [
+  "三种去处"
  ]
 }

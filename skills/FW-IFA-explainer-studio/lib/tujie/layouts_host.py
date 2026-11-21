@@ -5,7 +5,7 @@
   两侧标签  → 脸两侧、下巴高度，宽度按脸外侧剩余空间算
   身前元素  → 下巴以下
 """
-from .core import W, HOST_H, BuildError, br, esc, fit_fs, floaty, icon, tw
+from .core import W, HOST_H, BuildError, chars, chars_in, esc, plain, rich, fit_fs, floaty, icon, tw
 from .styles import brush_in
 
 TONES = {
@@ -42,8 +42,8 @@ def topshade(seg, h):
 
 def span_html(sp):
     if isinstance(sp, str):
-        return esc(sp)
-    return "".join(f'<span class="{c}" style="display:inline-block">{esc(t)}</span>' for t, c in sp)
+        return rich(sp)
+    return "".join(f'<span class="{c}" style="display:inline-block">{rich(t)}</span>' for t, c in sp)
 
 
 def _line_text(ln):
@@ -85,12 +85,15 @@ def title_top(film, seg):
         lid = f"{seg.id}-l{k}"
         if ln.get("cls") == "sub":
             body += (f'<div id="{lid}" class="ab" style="left:0;right:0;top:{y:.0f}px;text-align:center;font:400 {fs}px/1 SM;letter-spacing:3px;'
-                     f'color:{st.sub_color()};text-shadow:0 2px 4px rgba(0,0,0,.8),0 0 18px rgba(0,0,0,.6);opacity:0">{esc(txt)}</div>')
+                     f'color:{st.sub_color()};text-shadow:0 2px 4px rgba(0,0,0,.8),0 0 18px rgba(0,0,0,.6);opacity:0">{rich(txt)}</div>')
             script += st.sub_in(f"#{lid}", seg.at_t(ln, 0.1 + k * 0.4))
         else:
+            rv = (ln.get("reveal") or seg.data.get("reveal")) == "chars"
+            inner = "".join(chars(t_, c_) for t_, c_ in sp) if rv else span_html(sp)
             body += (f'<div id="{lid}" class="ab" style="left:0;right:0;top:{y:.0f}px;text-align:center;white-space:nowrap;'
-                     f'font:400 {fs}px/1 SM;letter-spacing:3px;opacity:0">{span_html(sp)}</div>')
-            script += st.title_in(f"#{lid}", seg.at_t(ln, 0.05 + k * 0.4))
+                     f'font:400 {fs}px/1 SM;letter-spacing:3px;opacity:0">{inner}</div>')
+            tt = seg.at_t(ln, 0.05 + k * 0.4)
+            script += chars_in(f"#{lid}", tt, len(plain(txt)), ln.get("per", 0.06)) if rv else st.title_in(f"#{lid}", tt)
             film.sfx_at(seg, seg.at_t(ln, 0.05 + k * 0.4), "swoosh")
         film.zone(seg, f"title{k}", 40, y, W - 80, fs)
         y += fs + gap
@@ -124,8 +127,8 @@ def side_tags(film, seg):
     card = lambda side, x_css, y, col, bg, zh, en: (
         f'<div id="{seg.id}-{side}" class="card" style="{x_css};top:{y:.0f}px;width:{tw_:.0f}px;height:{tag_h}px;padding:30px 22px;'
         f'border-color:{col};box-shadow:0 0 40px {col}55;background:{bg};border-radius:18px">'
-        f'<div class="t" style="font-size:{fs}px;color:#fff;font-family:SM">{esc(zh)}</div>'
-        f'<div class="e" style="color:{col}">{esc(en)}</div></div>')
+        f'<div class="t" style="font-size:{fs}px;color:#fff;font-family:SM">{rich(zh)}</div>'
+        f'<div class="e" style="color:{col}">{rich(en)}</div></div>')
     body = (f'<div id="{seg.id}-cl" class="ab" style="left:0;top:0;width:110px;height:{HOST_H}px;overflow:hidden"><svg id="{seg.id}-cls" width="110" height="1840" style="position:absolute;left:0;top:0">{chev(lc)}</svg></div>'
             f'<div id="{seg.id}-cr" class="ab" style="right:0;top:0;width:110px;height:{HOST_H}px;overflow:hidden"><svg id="{seg.id}-crs" width="110" height="1840" style="position:absolute;left:0;top:0;transform:scaleX(-1)">{chev(rc)}</svg></div>'
             + card("l", "left:30px", y_l, lc, lbg, *d["left"]) + card("r", "right:30px", y_r, rc, rbg, *d["right"]))
@@ -177,11 +180,11 @@ def chest_cards(film, seg):
     fs = min(52, fit_fs(max((c["zh"] for c in cards), key=tw), cw - 40, 52, 30))
     for k, c in enumerate(cards):
         x = 24 + k * (cw + gap)
-        tag = f'<div id="{seg.id}-t{k}" class="tag" style="left:22px;top:-30px;opacity:0">{esc(c["tag"])}</div>' if c.get("tag") else ""
+        tag = f'<div id="{seg.id}-t{k}" class="tag" style="left:22px;top:-30px;opacity:0">{rich(c["tag"])}</div>' if c.get("tag") else ""
         body += (f'<div id="{seg.id}-c{k}f" class="fl" style="left:{x:.0f}px;top:{top:.0f}px;width:{cw:.0f}px;height:{ch}px">'
                  f'<div id="{seg.id}-c{k}" class="card" style="left:0;top:0;width:{cw:.0f}px;height:{ch}px;padding:{(ch - fs - 30) / 2:.0f}px 0 0;text-align:center;opacity:0">'
-                 f'<div class="dash"></div><div id="{seg.id}-c{k}-g" class="glow"></div><div class="t" style="font-size:{fs}px">{esc(c["zh"])}</div>'
-                 f'<div class="e">{esc(c.get("en", f"{k + 1:02d}"))}</div></div>{tag}</div>')
+                 f'<div class="dash"></div><div id="{seg.id}-c{k}-g" class="glow"></div><div class="t" style="font-size:{fs}px">{rich(c["zh"])}</div>'
+                 f'<div class="e">{rich(c.get("en", f"{k + 1:02d}"))}</div></div>{tag}</div>')
     s += f'tl.fromTo([{",".join(chr(34) + "#" + seg.id + "-c" + str(k) + chr(34) for k in range(n))}],{{opacity:0,y:40}},{{opacity:0.45,y:0,duration:0.4,stagger:0.08,ease:"power3.out"}},0.4);\n'
     for k, t in enumerate(times):
         s += (f'tl.to("#{seg.id}-c{k}",{{opacity:1,duration:0.25}},{t:.3f});\n'
@@ -208,12 +211,12 @@ def namecard(film, seg):
     x = (W - w_) / 2
     photo = (f'<div class="ab" style="right:0;top:0;width:{w_ * 0.42:.0f}px;height:100%;background:url(\'{film.a(d["photo"])}\') center/cover;'
              f'-webkit-mask:linear-gradient(90deg,transparent,#000 45%)"></div>') if d.get("photo") else ""
-    tag = f'<div id="{seg.id}-tg" class="tag" style="left:26px;top:-28px;opacity:0">{esc(d["tag"])}</div>' if d.get("tag") else ""
+    tag = f'<div id="{seg.id}-tg" class="tag" style="left:26px;top:-28px;opacity:0">{rich(d["tag"])}</div>' if d.get("tag") else ""
     fs = min(64, fit_fs(d["name"], w_ * (0.5 if photo else 0.8), 64))
     body = (f'<div id="{seg.id}-f" class="fl" style="left:{x:.0f}px;top:{top:.0f}px;width:{w_}px;height:{h_}px">'
             f'<div id="{seg.id}-c" class="card" style="left:0;top:0;width:{w_}px;height:{h_}px;opacity:0">{photo}<div class="dash"></div>'
-            f'<div class="ab" style="left:44px;top:42px"><div class="t" style="font-size:{fs}px;letter-spacing:4px">{esc(d["name"])}</div>'
-            f'<div class="ab" style="left:2px;top:{fs + 18}px;white-space:nowrap;font:400 34px/1 SM;opacity:.82">{esc(d.get("role", ""))}</div></div>'
+            f'<div class="ab" style="left:44px;top:42px"><div class="t" style="font-size:{fs}px;letter-spacing:4px">{rich(d["name"])}</div>'
+            f'<div class="ab" style="left:2px;top:{fs + 18}px;white-space:nowrap;font:400 34px/1 SM;opacity:.82">{rich(d.get("role", ""))}</div></div>'
             f'</div>{tag}</div>')
     t = seg.at("t", 0.3)
     s = film.st.card_in(f"#{seg.id}-c", t, 0, film.rng(seg), "up")
@@ -236,13 +239,13 @@ def counter(film, seg):
     to = float(d["to"]); fr = float(d.get("from", 0))
     dec = int(d.get("decimals", 0))
     fmt = lambda v: f"{v:,.{dec}f}"
-    pre, suf = esc(d.get("prefix", "")), esc(d.get("suffix", ""))
+    pre, suf = rich(d.get("prefix", "")), rich(d.get("suffix", ""))
     fs = min(150, int((w_ - 80) / (len(pre + fmt(to) + suf) * 0.52)))
     plus = '<span style="font-size:.5em;vertical-align:top;margin-left:4px">+</span>' if d.get("plus") else ""
     body = (f'<div id="{seg.id}-f" class="fl" style="left:{x:.0f}px;top:{top:.0f}px;width:{w_}px;height:{h_}px">'
             f'<div id="{seg.id}-c" class="card" style="left:0;top:0;width:{w_}px;height:{h_}px;opacity:0;text-align:center"><div class="dash"></div>'
             f'<div class="numt" style="position:absolute;left:0;right:0;top:{(h_ - fs) / 2 + 12:.0f}px;font-size:{fs}px">{pre}<span id="{seg.id}-n">{fmt(fr)}</span>{suf}{plus}</div></div>'
-            f'<div id="{seg.id}-lb" class="tag" style="left:50%;top:-26px;transform:translateX(-50%);opacity:0">{esc(d.get("label", ""))}</div></div>')
+            f'<div id="{seg.id}-lb" class="tag" style="left:50%;top:-26px;transform:translateX(-50%);opacity:0">{rich(d.get("label", ""))}</div></div>')
     t = seg.at("t", 0.3)
     dur = float(d.get("dur", 1.1))
     s = film.st.card_in(f"#{seg.id}-c", t, 0, film.rng(seg), "up")
@@ -269,9 +272,9 @@ def sticker(film, seg):
     for k, w_ in enumerate(words):
         fs = min(120, fit_fs(w_["zh"], 760, 120))
         body += (f'<div id="{seg.id}-w{k}" class="ab" style="left:0;right:0;top:{top:.0f}px;text-align:center;opacity:0">'
-                 f'<div class="EN" style="margin-bottom:6px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6)">{esc(w_.get("en", ""))}</div>'
+                 f'<div class="EN" style="margin-bottom:6px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6)">{rich(w_.get("en", ""))}</div>'
                  f'<div style="display:inline-block;font:400 {fs}px/1 SM;letter-spacing:6px;color:{a};-webkit-text-stroke:3px #fff;paint-order:stroke fill;'
-                 f'filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))">{esc(w_["zh"])}</div></div>')
+                 f'filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))">{rich(w_["zh"])}</div></div>')
         t = times[k]
         s += f'tl.fromTo("#{seg.id}-w{k}",{{opacity:0,scale:1.5,rotation:-6}},{{opacity:1,scale:1,rotation:0,duration:0.35,ease:"back.out(2.2)"}},{t:.3f});\n'
         if k + 1 < len(words):
@@ -297,15 +300,15 @@ def gauge(film, seg):
     y0, hh = 240, 760
     marks = "".join(
         f'<div class="ab" style="left:0;right:0;top:{hh * (1 - m["pos"]):.0f}px;border-top:3px dashed rgba(255,255,255,.9)">'
-        f'<span class="tag" style="left:6px;top:-50px;font-size:30px">{esc(m["label"])}</span></div>' for m in d.get("marks", []))
+        f'<span class="tag" style="left:6px;top:-50px;font-size:30px">{rich(m["label"])}</span></div>' for m in d.get("marks", []))
     body = (f'<div id="{seg.id}-f" class="fl" style="left:{x}px;top:{y0}px;width:{w_}px;height:{hh + 220}px">'
             f'<div id="{seg.id}-g" class="ab" style="left:0;top:0;width:{w_}px;height:{hh + 220}px;opacity:0">'
-            f'<div class="card" style="left:0;top:0;width:{w_}px;height:104px;padding:18px 0;text-align:center"><div class="t" style="font-size:40px">{esc(d.get("title", ""))}</div>'
-            f'<div class="e" style="margin-top:8px">{esc(d.get("sub", ""))}</div></div>'
+            f'<div class="card" style="left:0;top:0;width:{w_}px;height:104px;padding:18px 0;text-align:center"><div class="t" style="font-size:40px">{rich(d.get("title", ""))}</div>'
+            f'<div class="e" style="margin-top:8px">{rich(d.get("sub", ""))}</div></div>'
             f'<div class="ab" style="left:14px;top:110px;width:{w_ - 28}px;height:{hh}px;border-radius:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25)">'
             f'<div id="{seg.id}-fill" class="ab" style="left:0;right:0;bottom:0;height:100%;transform-origin:50% 100%;'
             f'background:linear-gradient(180deg,rgba(214,80,90,.85),rgba(70,160,120,.75) 60%,rgba(60,110,200,.75))"></div>{marks}</div>'
-            f'<div class="card" style="left:0;top:{hh + 124}px;width:{w_}px;height:96px;padding:22px 0;text-align:center"><div class="t" style="font-size:40px">{esc(d.get("bottom_label", ""))}</div></div>'
+            f'<div class="card" style="left:0;top:{hh + 124}px;width:{w_}px;height:96px;padding:22px 0;text-align:center"><div class="t" style="font-size:40px">{rich(d.get("bottom_label", ""))}</div></div>'
             f'</div></div>')
     t = seg.at("t", 0.3)
     s = (f'tl.fromTo("#{seg.id}-g",{{opacity:0,x:{-60 if side == "left" else 60}}},{{opacity:1,x:0,duration:0.45,ease:"power3.out"}},{t:.3f});\n'
@@ -330,8 +333,8 @@ def plaque(film, seg):
     body = (f'<div id="{seg.id}-f" class="fl" style="left:{x:.0f}px;top:{top}px;width:{w_}px;height:{h_}px">'
             f'<div id="{seg.id}-c" class="card" style="left:0;top:0;width:{w_}px;height:{h_}px;opacity:0">{img}<div class="dash"></div>'
             f'<div id="{seg.id}-g" class="glow"></div>'
-            f'<div class="ab" style="left:{tx:.0f}px;right:0;top:{(h_ - fs) / 2 - 16:.0f}px;text-align:center"><div class="T1" style="font-size:{fs}px;letter-spacing:8px">{esc(d["zh"])}</div>'
-            f'<div class="EN" style="margin-top:12px">{esc(d.get("en", ""))}</div></div></div></div>')
+            f'<div class="ab" style="left:{tx:.0f}px;right:0;top:{(h_ - fs) / 2 - 16:.0f}px;text-align:center"><div class="T1" style="font-size:{fs}px;letter-spacing:8px">{rich(d["zh"])}</div>'
+            f'<div class="EN" style="margin-top:12px">{rich(d.get("en", ""))}</div></div></div></div>')
     t = seg.at("t", 0.3)
     s = film.st.card_in(f"#{seg.id}-c", t, 0, film.rng(seg), "up") + f'tl.fromTo("#{seg.id}-g",{{opacity:0}},{{opacity:1,duration:0.3}},{t + 0.4:.3f});\n'
     s += floaty(f"#{seg.id}-f", seg.d, 6, 3.6, t + 0.6)
@@ -355,12 +358,12 @@ def ring(film, seg):
     for k, (zh, en) in enumerate(tiles):
         px, py = cx + pos[k][0] * R * 0.92 - 85, cy + pos[k][1] * R * 0.62 - 50
         tl_html += (f'<div id="{seg.id}-t{k}" class="card" style="left:{px:.0f}px;top:{py:.0f}px;width:170px;height:100px;padding:18px 0;text-align:center;opacity:0">'
-                    f'<div class="t" style="font-size:40px">{esc(zh)}</div><div class="e" style="margin-top:6px;font-size:13px">{esc(en)}</div></div>')
+                    f'<div class="t" style="font-size:40px">{rich(zh)}</div><div class="e" style="margin-top:6px;font-size:13px">{rich(en)}</div></div>')
     body = (f'<div id="{seg.id}-r" class="ab" style="left:{cx - R:.0f}px;top:{cy - R:.0f}px;width:{R * 2}px;height:{R * 2}px;opacity:0">'
             f'<div class="hud ab" style="inset:0;border-radius:50%;border:3px solid {film.st.c["a"]};box-shadow:0 0 30px {film.st.c["a"]}99,inset 0 0 30px {film.st.c["a"]}55"></div>'
             f'<svg id="{seg.id}-arc" class="ab" style="left:-24px;top:-24px" width="{R * 2 + 48}" height="{R * 2 + 48}"><circle cx="{R + 24}" cy="{R + 24}" r="{R + 14}" fill="none" stroke="{film.st.c["a"]}" stroke-width="4" stroke-dasharray="120 60 30 60" opacity=".75"/></svg>'
             f'<div class="card" style="left:{R - 130}px;top:{R - 130}px;width:260px;height:260px;border-radius:50%;text-align:center;padding-top:84px">'
-            f'<div class="t" style="font-size:52px">{esc(d["center"][0])}</div><div class="e">{esc(d["center"][1])}</div></div></div>' + tl_html)
+            f'<div class="t" style="font-size:52px">{rich(d["center"][0])}</div><div class="e">{rich(d["center"][1])}</div></div></div>' + tl_html)
     t = seg.at("t", 0.3)
     s = (f'tl.fromTo("#{seg.id}-r",{{opacity:0,scale:0.6}},{{opacity:1,scale:1,duration:0.6,ease:"back.out(1.5)"}},{t:.3f});\n'
          f'tl.fromTo("#{seg.id}-arc",{{rotation:0}},{{rotation:200,duration:{seg.d:.2f},ease:"none"}},0);\n')

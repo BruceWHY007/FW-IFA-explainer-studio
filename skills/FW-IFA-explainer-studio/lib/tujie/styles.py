@@ -43,23 +43,111 @@ class Style:
         self.css = self.css_tpl % c
         return self
 
-    # ---------------- 动作签名（入场）
-    def title_in(self, sel, t, dur=0.42):
-        return f'tl.fromTo("{sel}",{{opacity:0,scale:1.3,filter:"blur(12px)"}},{{opacity:1,scale:1,filter:"blur(0px)",duration:{dur},ease:"power4.out"}},{t:.3f});\n'
+    # ---------------- 动作签名（入场）。默认用本风格的，段落层参数可以按内容换（见 set_mode）
+    enter_default = "blur"
+    card_default = "slide"
+
+    def set_mode(self, data):
+        """每段开始前调用：按这一段 data 里的 energy／enter／card_enter 调整动作。"""
+        self.mode = {"energy": data.get("energy", "normal"), "enter": data.get("enter"), "card": data.get("card_enter")}
+
+    def _k(self):
+        return {"calm": 1.35, "punch": 0.72}.get(getattr(self, "mode", {}).get("energy"), 1.0)
+
+    def _ease(self, default):
+        return {"calm": "power2.out", "punch": "expo.out"}.get(getattr(self, "mode", {}).get("energy"), default)
+
+    def title_in(self, sel, t, dur=None):
+        name = (getattr(self, "mode", {}) or {}).get("enter") or self.enter_default
+        fn = ENTER.get(name) or ENTER[self.enter_default]
+        return fn(sel, t, (dur or ENTER_DUR[name if name in ENTER else self.enter_default]) * self._k(), self._ease)
 
     def sub_in(self, sel, t):
-        return f'tl.fromTo("{sel}",{{opacity:0,y:16}},{{opacity:1,y:0,duration:0.38,ease:"power3.out"}},{t:.3f});\n'
+        return f'tl.fromTo("{sel}",{{opacity:0,y:16}},{{opacity:1,y:0,duration:{0.38 * self._k():.2f},ease:"{self._ease("power3.out")}"}},{t:.3f});\n'
 
     def card_in(self, sel, t, k=0, rng=None, frm="right"):
-        dx = {"right": 80, "left": -80}.get(frm, 0)
-        dy = {"up": 60, "down": -60}.get(frm, 0)
-        return f'tl.fromTo("{sel}",{{opacity:0,x:{dx},y:{dy}}},{{opacity:1,x:0,y:0,duration:0.5,ease:"power3.out"}},{t:.3f});\n'
+        name = (getattr(self, "mode", {}) or {}).get("card") or self.card_default
+        fn = CARD.get(name) or CARD[self.card_default]
+        return fn(sel, t, self._k(), self._ease, k, rng, frm)
 
     def stamp_in(self, sel, t):
-        return f'tl.fromTo("{sel}",{{opacity:0,scale:2.2,rotation:-18}},{{opacity:1,scale:1,rotation:-8,duration:0.28,ease:"power4.in"}},{t:.3f});\n'
+        return f'tl.fromTo("{sel}",{{opacity:0,scale:2.2,rotation:-18}},{{opacity:1,scale:1,rotation:-8,duration:{0.28 * self._k():.2f},ease:"power4.in"}},{t:.3f});\n'
 
     def out(self, sel, t, dur=0.25):
         return f'tl.to("{sel}",{{opacity:0,y:-20,duration:{dur},ease:"power2.in"}},{t:.3f});\n'
+
+
+# ---------------------------------------------------------------- 共用动作库
+# 标题入场：每套风格有默认的一种（动作签名），段落可以按内容换成别的
+def _blur(sel, t, dur, ease):
+    return f'tl.fromTo("{sel}",{{opacity:0,scale:1.3,filter:"blur(12px)"}},{{opacity:1,scale:1,filter:"blur(0px)",duration:{dur:.2f},ease:"{ease("power4.out")}"}},{t:.3f});\n'
+
+
+def _stretch(sel, t, dur, ease):  # 字距收拢的效果用横向缩放做（字距动画会按整像素跳，逐帧渲染时发抖）
+    return f'tl.fromTo("{sel}",{{opacity:0,scaleX:1.45,filter:"blur(6px)"}},{{opacity:1,scaleX:1,filter:"blur(0px)",duration:{dur:.2f},ease:"{ease("power3.out")}"}},{t:.3f});\n'
+
+
+def _wipe(sel, t, dur, ease):
+    return (f'tl.fromTo("{sel}",{{opacity:0,clipPath:"inset(0% 100% 0% 0%)",y:10}},'
+            f'{{opacity:1,clipPath:"inset(0% 0% 0% 0%)",y:0,duration:{dur:.2f},ease:"{ease("power2.inOut")}"}},{t:.3f});\n')
+
+
+def _flip(sel, t, dur, ease):
+    return (f'tl.set("{sel}",{{transformPerspective:900}},0);\n'
+            f'tl.fromTo("{sel}",{{opacity:0,rotationX:-70,y:24}},{{opacity:1,rotationX:0,y:0,duration:{dur:.2f},ease:"{ease("power3.out")}"}},{t:.3f});\n')
+
+
+def _flicker(sel, t, dur, ease):
+    return (f'tl.set("{sel}",{{opacity:0}},0);\n'
+            f'tl.to("{sel}",{{keyframes:[{{opacity:1,duration:0.04}},{{opacity:0.15,duration:0.05}},{{opacity:1,duration:0.05}},'
+            f'{{opacity:0.35,duration:0.06}},{{opacity:1,duration:0.08}}]}},{t:.3f});\n')
+
+
+def _rise(sel, t, dur, ease):
+    return f'tl.fromTo("{sel}",{{opacity:0,y:46}},{{opacity:1,y:0,duration:{dur:.2f},ease:"{ease("power3.out")}"}},{t:.3f});\n'
+
+
+def _zoom(sel, t, dur, ease):  # 冲击：从小放大并回弹，适合反问、转折、结论
+    return f'tl.fromTo("{sel}",{{opacity:0,scale:0.4}},{{opacity:1,scale:1,duration:{dur:.2f},ease:"back.out(2.2)"}},{t:.3f});\n'
+
+
+ENTER = {"blur": _blur, "stretch": _stretch, "wipe": _wipe, "flip": _flip, "flicker": _flicker, "rise": _rise, "zoom": _zoom}
+ENTER_DUR = {"blur": 0.42, "stretch": 0.7, "wipe": 0.7, "flip": 0.55, "flicker": 0.3, "rise": 0.5, "zoom": 0.45}
+
+
+# 卡片入场
+def _c_slide(sel, t, k, ease, i, rng, frm):
+    dx = {"right": 80, "left": -80}.get(frm, 0)
+    dy = {"up": 60, "down": -60}.get(frm, 0)
+    return f'tl.fromTo("{sel}",{{opacity:0,x:{dx},y:{dy}}},{{opacity:1,x:0,y:0,duration:{0.5 * k:.2f},ease:"{ease("power3.out")}"}},{t:.3f});\n'
+
+
+def _c_drop(sel, t, k, ease, i, rng, frm):
+    r = rng.uniform(-3, 3) if rng else 0
+    return f'tl.fromTo("{sel}",{{opacity:0,y:70,rotation:{r + 4:.1f}}},{{opacity:1,y:0,rotation:{r:.1f},duration:{0.55 * k:.2f},ease:"back.out(1.3)"}},{t:.3f});\n'
+
+
+def _c_swing(sel, t, k, ease, i, rng, frm):
+    ry = 28 if frm != "left" else -28
+    return (f'tl.set("{sel}",{{transformPerspective:1400}},0);\n'
+            f'tl.fromTo("{sel}",{{opacity:0,rotationY:{ry},x:{ry * 2}}},{{opacity:1,rotationY:0,x:0,duration:{0.6 * k:.2f},ease:"{ease("power3.out")}"}},{t:.3f});\n')
+
+
+def _c_toss(sel, t, k, ease, i, rng, frm):
+    r = rng.uniform(-16, 16) if rng else (-12 if i % 2 else 12)
+    return f'tl.fromTo("{sel}",{{opacity:0,y:-260,rotation:{r:.1f}}},{{opacity:1,y:0,rotation:0,duration:{0.7 * k:.2f},ease:"back.out(1.2)"}},{t:.3f});\n'
+
+
+def _c_pop(sel, t, k, ease, i, rng, frm):
+    return (f'tl.fromTo("{sel}",{{opacity:0,scale:0.86}},{{opacity:1,scale:1,duration:{0.35 * k:.2f},ease:"back.out(2)"}},{t:.3f});\n'
+            f'tl.fromTo("{sel}",{{filter:"brightness(2.2)"}},{{filter:"brightness(1)",duration:0.4,ease:"power2.out"}},{t + 0.05:.3f});\n')
+
+
+def _c_rise(sel, t, k, ease, i, rng, frm):
+    return f'tl.fromTo("{sel}",{{opacity:0,y:40}},{{opacity:1,y:0,duration:{0.45 * k:.2f},ease:"{ease("power3.out")}"}},{t:.3f});\n'
+
+
+CARD = {"slide": _c_slide, "drop": _c_drop, "swing": _c_swing, "toss": _c_toss, "pop": _c_pop, "rise": _c_rise}
 
 
 # ======================================================================== 1 炭金
@@ -73,6 +161,7 @@ class Tanjin(Style):
     pip = {"shape": "circle", "size": 290}
     chart, quote, chapter = "glass", "particles", "orn"
     signature = ["bigword_band", "chain", "quote"]
+    enter_default, card_default = "blur", "slide"
     css_tpl = """
 .T1{background:linear-gradient(180deg,#FFF8EE 0%%,%(hi)s 30%%,%(a2)s 50%%,%(deep)s 56%%,%(a2)s 74%%,%(hi)s 100%%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 rgba(30,12,4,.9)) drop-shadow(0 12px 22px rgba(0,0,0,.6));font-family:SM}
 .T2{background:linear-gradient(180deg,#FFFFFF 0%%,#EEF0F4 32%%,#A9AFBA 50%%,#565C68 56%%,#C6CBD4 76%%,#FFFFFF 100%%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 0 #1d2027) drop-shadow(0 12px 22px rgba(0,0,0,.6));font-family:SM}
@@ -100,6 +189,7 @@ class Tanjin(Style):
 .bgbase{position:absolute;inset:0;background:#0B0B0D}
 .motifc{color:rgba(%(argb)s,.10)}
 .chip{color:%(a)s}
+.hl{color:%(hi)s;-webkit-text-fill-color:%(hi)s;text-shadow:0 0 18px rgba(%(argb)s,.6)}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,#141213 0%%,#0C0B0C 38%%,#070707 100%%)}
 .dkg{position:absolute;left:290px;top:1576px;width:500px;height:170px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.20),transparent 70%%)}
@@ -131,6 +221,7 @@ class Dangan(Style):
     pip = {"shape": "circle", "size": 250}
     chart, quote, chapter = "glass", "banner", "marquee"
     signature = ["logo_wall", "doc", "chapter"]
+    enter_default, card_default = "stretch", "drop"
     css_tpl = """
 .T1{background:linear-gradient(180deg,#FFFFFF 0%%,#ECECEC 36%%,#8C8C8C 50%%,#F4F4F4 63%%,#B9B9B9 100%%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 rgba(0,0,0,.8)) drop-shadow(0 10px 20px rgba(0,0,0,.65));font-family:SR}
 .T2{color:%(a)s;font-family:SR;text-shadow:0 2px 12px rgba(0,0,0,.6)}
@@ -160,6 +251,7 @@ class Dangan(Style):
 .chip{color:%(a)s}
 .seal{position:absolute;width:150px;height:150px;border-radius:50%%;background:radial-gradient(circle at 38%% 32%%,#F07A3A,#C2361A 55%%,#8E220E);box-shadow:0 6px 14px rgba(0,0,0,.5),inset 0 -6px 12px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font:400 46px/1 SR;color:rgba(255,236,220,.92);letter-spacing:2px}
 .streak{position:absolute;left:0;right:0;overflow:hidden;background:linear-gradient(90deg,#1A0610,#3A0C22 30%%,#2A0818 70%%,#12040A)}
+.hl{color:%(m)s;-webkit-text-fill-color:%(m)s}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,#17110E,#0D0907)}
 .dkg{position:absolute;left:240px;top:1576px;width:600px;height:150px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.16),transparent 70%%)}
@@ -180,14 +272,6 @@ class Dangan(Style):
 .cap{text-shadow:0 2px 4px rgba(0,0,0,.9),0 0 14px rgba(0,0,0,.8),0 0 30px rgba(0,0,0,.5)}
 """
 
-    def title_in(self, sel, t, dur=0.7):
-        # 字距收拢的效果用横向缩放做（字距动画会按整像素跳，逐帧渲染时发抖）
-        return (f'tl.fromTo("{sel}",{{opacity:0,scaleX:1.45,filter:"blur(6px)"}},'
-                f'{{opacity:1,scaleX:1,filter:"blur(0px)",duration:{dur},ease:"power3.out"}},{t:.3f});\n')
-
-    def card_in(self, sel, t, k=0, rng=None, frm="up"):
-        r = (rng.uniform(-3, 3) if rng else 0)
-        return f'tl.fromTo("{sel}",{{opacity:0,y:70,rotation:{r + 4:.1f}}},{{opacity:1,y:0,rotation:{r:.1f},duration:0.55,ease:"back.out(1.3)"}},{t:.3f});\n'
 
 
 # ======================================================================== 3 矿石
@@ -201,6 +285,7 @@ class Kuangshi(Style):
     pip = {"shape": "squircle", "size": 300}
     chart, quote, chapter = "glass", "brush", "plaque"
     signature = ["plaque", "compare", "band"]
+    enter_default, card_default = "wipe", "swing"
     css_tpl = """
 .T1{background:linear-gradient(180deg,#FFF7DA 0%%,#F5DC94 30%%,#C9973A 52%%,#FBE7A8 70%%,#A97C2B 100%%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 rgba(40,24,4,.95)) drop-shadow(0 0 18px rgba(%(argb)s,.35)) drop-shadow(0 10px 18px rgba(0,0,0,.6));font-family:SM}
 .T2{color:#F3EBDD;font-family:SM;text-shadow:0 2px 0 rgba(0,0,0,.6),0 6px 16px rgba(0,0,0,.6)}
@@ -229,6 +314,7 @@ class Kuangshi(Style):
 .motifc{color:rgba(%(argb)s,.12)}
 .chip{color:%(a)s}
 .ruler{position:absolute;left:0;right:0;height:44px}
+.hl{color:#FFD66B;-webkit-text-fill-color:#FFD66B;text-shadow:0 0 16px rgba(%(argb)s,.6)}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,rgba(14,13,12,.86),rgba(8,8,8,.95)),url('%(tex_stone)s') center/cover}
 .dkg{position:absolute;left:290px;top:1576px;width:500px;height:150px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.18),transparent 70%%)}
@@ -248,14 +334,6 @@ class Kuangshi(Style):
 .cap{text-shadow:0 2px 4px rgba(0,0,0,.9),0 0 16px rgba(0,0,0,.8),0 0 32px rgba(0,0,0,.5)}
 """
 
-    def title_in(self, sel, t, dur=0.7):
-        return (f'tl.fromTo("{sel}",{{opacity:0,clipPath:"inset(0% 100% 0% 0%)",y:10}},'
-                f'{{opacity:1,clipPath:"inset(0% 0% 0% 0%)",y:0,duration:{dur},ease:"power2.inOut"}},{t:.3f});\n')
-
-    def card_in(self, sel, t, k=0, rng=None, frm="right"):
-        ry = 28 if frm != "left" else -28
-        return (f'tl.set("{sel}",{{transformPerspective:1400}},0);\n'
-                f'tl.fromTo("{sel}",{{opacity:0,rotationY:{ry},x:{ry * 2}}},{{opacity:1,rotationY:0,x:0,duration:0.6,ease:"power3.out"}},{t:.3f});\n')
 
 
 # ======================================================================== 4 瓷蓝
@@ -269,6 +347,7 @@ class Cilan(Style):
     pip = {"shape": "circle", "size": 230}
     chart, quote, chapter = "paper", "block", "hud"
     signature = ["counter", "bars", "ring"]
+    enter_default, card_default = "flip", "toss"
     css_tpl = """
 .T1{background:linear-gradient(180deg,#FFFFFF 0%%,#EEF3FF 45%%,%(lt)s 100%%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 rgba(10,20,50,.8)) drop-shadow(0 0 20px rgba(%(argb)s,.35));font-family:SM}
 .T2{color:%(lt)s;font-family:SM;text-shadow:0 2px 12px rgba(0,0,0,.5)}
@@ -297,6 +376,7 @@ class Cilan(Style):
 .motifc{color:rgba(190,205,230,.07)}
 .chip{color:%(lt)s}
 .hud{position:absolute;border-radius:50%%;border:3px solid rgba(%(argb)s,.85);box-shadow:0 0 30px rgba(%(argb)s,.6),inset 0 0 30px rgba(%(argb)s,.35)}
+.hl{color:%(li)s;-webkit-text-fill-color:%(li)s}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,#18202B,#0E131A)}
 .dkg{position:absolute;left:290px;top:1576px;width:500px;height:150px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.22),transparent 70%%)}
@@ -316,13 +396,6 @@ class Cilan(Style):
 .cap{text-shadow:0 2px 4px rgba(5,10,25,.85),0 0 14px rgba(5,10,25,.75),0 0 30px rgba(5,10,25,.45)}
 """
 
-    def title_in(self, sel, t, dur=0.55):
-        return (f'tl.set("{sel}",{{transformPerspective:900}},0);\n'
-                f'tl.fromTo("{sel}",{{opacity:0,rotationX:-70,y:24}},{{opacity:1,rotationX:0,y:0,duration:{dur},ease:"power3.out"}},{t:.3f});\n')
-
-    def card_in(self, sel, t, k=0, rng=None, frm="right"):
-        r = rng.uniform(-16, 16) if rng else (-12 if k % 2 else 12)
-        return f'tl.fromTo("{sel}",{{opacity:0,y:-260,rotation:{r:.1f}}},{{opacity:1,y:0,rotation:0,duration:0.7,ease:"back.out(1.2)"}},{t:.3f});\n'
 
 
 # ======================================================================== 5 霓虹
@@ -336,6 +409,7 @@ class Nihong(Style):
     pip = {"shape": "rect", "size": 240}
     chart, quote, chapter = "glass", "brush", "split"
     signature = ["tilt_chart", "product_row", "quote"]
+    enter_default, card_default = "flicker", "pop"
     css_tpl = """
 .T1{color:#F7EEFF;font-family:SM;text-shadow:0 0 6px rgba(255,255,255,.6),0 0 16px %(a)s,0 0 38px rgba(%(argb)s,.75)}
 .T2{color:%(m)s;font-family:SM;text-shadow:0 0 10px rgba(%(mrgb)s,.75),0 0 28px rgba(%(mrgb)s,.45)}
@@ -363,6 +437,7 @@ class Nihong(Style):
 .bgbase{position:absolute;inset:0;background:radial-gradient(70%% 40%% at 20%% 15%%,rgba(%(argb)s,.22),transparent 70%%),radial-gradient(60%% 40%% at 85%% 70%%,rgba(%(mrgb)s,.14),transparent 70%%),#07060B}
 .motifc{color:rgba(%(argb)s,.10)}
 .chip{color:%(m)s}
+.hl{color:%(m)s;-webkit-text-fill-color:%(m)s;text-shadow:0 0 12px rgba(%(mrgb)s,.8)}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,#0C0814,#050407)}
 .dkg{position:absolute;left:240px;top:1576px;width:600px;height:160px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.28),transparent 70%%)}
@@ -382,18 +457,10 @@ class Nihong(Style):
 .cap{text-shadow:0 2px 4px rgba(0,0,0,.9),0 0 14px rgba(0,0,0,.8),0 0 30px rgba(0,0,0,.5)}
 """
 
-    def title_in(self, sel, t, dur=0.5):
-        return (f'tl.set("{sel}",{{opacity:0}},0);\n'
-                f'tl.to("{sel}",{{keyframes:[{{opacity:1,duration:0.04}},{{opacity:0.15,duration:0.05}},{{opacity:1,duration:0.05}},'
-                f'{{opacity:0.35,duration:0.06}},{{opacity:1,duration:0.08}}]}},{t:.3f});\n')
-
     def brush_in(self, sel, t, dur=0.7):
         return (f'tl.fromTo("{sel}",{{opacity:1,clipPath:"inset(-20% 100% -20% 0%)"}},'
                 f'{{opacity:1,clipPath:"inset(-20% 0% -20% 0%)",duration:{dur},ease:"power2.out"}},{t:.3f});\n')
 
-    def card_in(self, sel, t, k=0, rng=None, frm="right"):
-        return (f'tl.fromTo("{sel}",{{opacity:0,scale:0.86}},{{opacity:1,scale:1,duration:0.35,ease:"back.out(2)"}},{t:.3f});\n'
-                f'tl.fromTo("{sel}",{{filter:"brightness(2.2)"}},{{filter:"brightness(1)",duration:0.4,ease:"power2.out"}},{t + 0.05:.3f});\n')
 
 
 STYLES = {s.key: s for s in (Tanjin, Dangan, Kuangshi, Cilan, Nihong)}

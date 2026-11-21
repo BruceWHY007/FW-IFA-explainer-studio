@@ -160,8 +160,37 @@ def place_caption(seg, text, y):
     return f"top:{ny:.0f}px"
 
 
+def caption_keywords(film):
+    """字幕里要变色的词：plan.keywords ＋ 分镜表各段文字里用 *…* 标出的重点词。"""
+    import re as _re
+    kws = set(film.plan.get("keywords", []))
+
+    def walk(v):
+        if isinstance(v, str):
+            kws.update(w for w in _re.findall(r"\*(.+?)\*", v) if 1 < len(w) <= 8)
+        elif isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+    for s in film.segs:
+        walk(s.data)
+    return sorted(kws, key=len, reverse=True)
+
+
+def mark(text, kws):
+    out = esc(text)
+    for w in kws:
+        ew = esc(w)
+        if ew in out and f'>{ew}<' not in out:
+            out = out.replace(ew, f'<span class="hl">{ew}</span>', 1)
+    return out
+
+
 def captions(film):
     caps = film.plan.get("_captions", [])
+    kws = caption_keywords(film)
     skip = film.plan.get("caption_skip", [])
     slots = []
     for s in film.segs:
@@ -183,7 +212,7 @@ def captions(film):
             continue
         gid = f"cp{k}"
         pos = place_caption(sg_of(film, s0), c["text"], y)
-        groups += f'<div id="{gid}" class="cap" style="{pos}">{esc(c["text"])}</div>'
+        groups += f'<div id="{gid}" class="cap" style="{pos}">{mark(c["text"], kws)}</div>'
         cs += (f'tl.fromTo("#{gid}",{{opacity:0,y:8}},{{opacity:1,y:0,duration:0.12,ease:"power2.out"}},{s0:.3f});\n'
                f'tl.to("#{gid}",{{opacity:0,duration:0.08}},{max(s0 + 0.15, s1 - 0.08):.3f});\n'
                f'tl.set("#{gid}",{{visibility:"hidden"}},{s1:.3f});\n')
