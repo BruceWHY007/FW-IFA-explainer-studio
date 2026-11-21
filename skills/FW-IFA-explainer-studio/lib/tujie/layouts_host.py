@@ -93,7 +93,7 @@ def title_top(film, seg):
             body += (f'<div id="{lid}" class="ab" style="left:0;right:0;top:{y:.0f}px;text-align:center;white-space:nowrap;'
                      f'font:400 {fs}px/1 SM;letter-spacing:3px;opacity:0">{inner}</div>')
             tt = seg.at_t(ln, 0.05 + k * 0.4)
-            script += chars_in(f"#{lid}", tt, len(plain(txt)), ln.get("per", 0.06)) if rv else st.title_in(f"#{lid}", tt)
+            script += chars_in(f"#{lid}", tt, len(plain(txt)), ln.get("per") or film.reveal_per(txt, seg, 0.06)) if rv else st.title_in(f"#{lid}", tt)
             film.sfx_at(seg, seg.at_t(ln, 0.05 + k * 0.4), "swoosh")
         film.zone(seg, f"title{k}", 40, y, W - 80, fs)
         y += fs + gap
@@ -129,8 +129,8 @@ def side_tags(film, seg):
         f'border-color:{col};box-shadow:0 0 40px {col}55;background:{bg};border-radius:18px">'
         f'<div class="t" style="font-size:{fs}px;color:#fff;font-family:SM">{rich(zh)}</div>'
         f'<div class="e" style="color:{col}">{rich(en)}</div></div>')
-    body = (f'<div id="{seg.id}-cl" class="ab" style="left:0;top:0;width:110px;height:{HOST_H}px;overflow:hidden"><svg id="{seg.id}-cls" width="110" height="1840" style="position:absolute;left:0;top:0">{chev(lc)}</svg></div>'
-            f'<div id="{seg.id}-cr" class="ab" style="right:0;top:0;width:110px;height:{HOST_H}px;overflow:hidden"><svg id="{seg.id}-crs" width="110" height="1840" style="position:absolute;left:0;top:0;transform:scaleX(-1)">{chev(rc)}</svg></div>'
+    body = (f'<div id="{seg.id}-cl" class="ab" data-layout-ignore style="left:0;top:0;width:110px;height:{HOST_H}px;overflow:hidden"><svg id="{seg.id}-cls" width="110" height="1840" style="position:absolute;left:0;top:0">{chev(lc)}</svg></div>'
+            f'<div id="{seg.id}-cr" class="ab" data-layout-ignore style="right:0;top:0;width:110px;height:{HOST_H}px;overflow:hidden"><svg id="{seg.id}-crs" width="110" height="1840" style="position:absolute;left:0;top:0;transform:scaleX(-1)">{chev(rc)}</svg></div>'
             + card("l", "left:30px", y_l, lc, lbg, *d["left"]) + card("r", "right:30px", y_r, rc, rbg, *d["right"]))
     tl_, tr_ = seg.at("tl", 0.1), seg.at("tr", 0.8)
     s = (f'tl.fromTo("#{seg.id}-cls",{{y:-130}},{{y:0,duration:{seg.d:.2f},ease:"none"}},0);\n'
@@ -271,7 +271,7 @@ def sticker(film, seg):
     times = seg.times(words, first=0.2)
     for k, w_ in enumerate(words):
         fs = min(120, fit_fs(w_["zh"], 760, 120))
-        body += (f'<div id="{seg.id}-w{k}" class="ab" style="left:0;right:0;top:{top:.0f}px;text-align:center;opacity:0">'
+        body += (f'<div id="{seg.id}-w{k}" class="ab" data-layout-allow-overlap style="left:0;right:0;top:{top:.0f}px;text-align:center;opacity:0">'
                  f'<div class="EN" style="margin-bottom:6px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.6)">{rich(w_.get("en", ""))}</div>'
                  f'<div style="display:inline-block;font:400 {fs}px/1 SM;letter-spacing:6px;color:{a};-webkit-text-stroke:3px #fff;paint-order:stroke fill;'
                  f'filter:drop-shadow(0 6px 14px rgba(0,0,0,.5))">{rich(w_["zh"])}</div></div>')
@@ -378,7 +378,14 @@ def ring(film, seg):
     film.scene(seg.id, body, s)
 
 
+# ---------------------------------------------------------------- 不加包装
+def plain_layout(film, seg):
+    """只留人物和字幕：让人物说话、给观众喘口气的段落。全片人物段里留几段 plain，节奏才有松有紧。"""
+    film.scene(seg.id, "", "")
+
+
 HOST_LAYOUTS = {
+    "plain": plain_layout,
     "title_top": title_top, "side_tags": side_tags, "chest_cards": chest_cards, "namecard": namecard,
     "counter": counter, "sticker": sticker, "gauge": gauge, "plaque": plaque, "ring": ring,
 }

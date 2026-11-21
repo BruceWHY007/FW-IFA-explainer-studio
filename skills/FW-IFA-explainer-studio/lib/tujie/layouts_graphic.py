@@ -5,7 +5,7 @@
 """
 import math
 from .core import W, HOST_H, CAP_Y, BuildError, chars, chars_in, drift, esc, plain, rich, fit_fs, floaty, icon, lcg, pip, pip_in, sway, tw
-from .frame import band, graphic_bg, motif_pattern
+from .frame import band, grade_cls, grade_ov, graphic_bg, motif_pattern
 from .styles import brush_in
 
 NOTE = "示意 · ILLUSTRATIVE"
@@ -57,15 +57,16 @@ def card_img(seg_id, x, y, w, h, zh, en, img, num="", fs=56):
     numh = f'<div class="ab k" style="left:34px;top:{h / 2 - 60:.0f}px">{num}</div>' if num else ""
     tx = 150 if num else 40
     nl = zh.count("|") + 1
+    fs = min(fs, fit_fs(max(zh.split("|"), key=tw), w - tx - 30, fs, 28))  # 按卡宽缩字号，不换行
     ty = h / 2 - (nl * fs * 1.1 + 30) / 2
     ey = ty + nl * fs * 1.1 + 12
-    imgh = (f'<div class="ab" style="right:0;top:0;width:{w * 0.5:.0f}px;height:100%;background:url(\'{img}\') center/cover;'
+    imgh = (f'<div class="ab grade" style="right:0;top:0;width:{w * 0.5:.0f}px;height:100%;background:url(\'{img}\') center/cover;'
             f'-webkit-mask:linear-gradient(90deg,transparent,#000 60%);opacity:.9"></div>') if img else ""
     return (f'<div id="{seg_id}f" class="fl" style="left:{x:.0f}px;top:{y:.0f}px;width:{w:.0f}px;height:{h:.0f}px">'
             f'<div id="{seg_id}" class="card" style="left:0;top:0;width:{w:.0f}px;height:{h:.0f}px">{imgh}'
             f'<div class="dash"></div><div id="{seg_id}-g" class="glow"></div>{numh}'
-            f'<div class="ab t" style="left:{tx}px;top:{ty:.0f}px;font-size:{fs}px;text-shadow:0 2px 12px rgba(0,0,0,.35)">{rich(zh)}</div>'
-            f'<div class="ab e" style="left:{tx + 2}px;top:{ey:.0f}px;margin:0">{rich(en)}</div></div></div>')
+            f'<div class="ab t" style="left:{tx}px;top:{ty:.0f}px;font-size:{fs}px;white-space:nowrap;text-shadow:0 2px 12px rgba(0,0,0,.35)">{rich(zh)}</div>'
+            f'<div class="ab e" data-layout-allow-overlap style="left:{tx + 2}px;top:{ey:.0f}px;margin:0">{rich(en)}</div></div></div>')
 
 
 def lightup(seg, ids, times, dim=0.42):
@@ -103,13 +104,13 @@ def bigword_band(film, seg):
     tick = "&nbsp;&nbsp;·&nbsp;&nbsp;".join(rich(x) for x in (d.get("ticker") or ["MARKET", "VALUE", "GROWTH"]) * 4)
     body += (f'<div id="{seg.id}-tick" class="ab" style="left:0;top:1100px;width:1080px;height:64px;border-top:1px solid rgba(255,255,255,.25);'
              f'border-bottom:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.45);overflow:hidden">'
-             f'<div id="{seg.id}-ticktx" class="EN chip" style="position:absolute;left:0;top:21px;white-space:nowrap">{tick}</div></div>')
+             f'<div id="{seg.id}-ticktx" class="EN chip" data-layout-ignore style="position:absolute;left:0;top:21px;white-space:nowrap">{tick}</div></div>')
     shape = film.st.pip["shape"]
     spec = pip_spec(film, seg, (shape, 30, 860, 280 if shape != "rect" else 240, 280 if shape != "rect" else 300))
     ph, ps = put_pip(film, seg, spec)
     body += ph
     s += (f'tl.fromTo("#{seg.id}-bandw",{{opacity:0,y:50}},{{opacity:1,y:0,duration:0.5,ease:"power3.out"}},0);\n'
-          + (chars_in(f"#{seg.id}-big", wt, len(plain(d["word"])), 0.09) if rv else st.title_in(f"#{seg.id}-big", wt))
+          + (chars_in(f"#{seg.id}-big", wt, len(plain(d["word"])), d.get("per") or film.reveal_per(d["word"], seg, 0.09)) if rv else st.title_in(f"#{seg.id}-big", wt))
           + f'tl.fromTo("#{seg.id}-tick",{{opacity:0}},{{opacity:1,duration:0.4}},0.3);\n'
           + f'tl.fromTo("#{seg.id}-ticktx",{{x:0}},{{x:-900,duration:{seg.d:.2f},ease:"none"}},0);\n' + ps)
     film.sfx_at(seg, wt, "impact")
@@ -139,8 +140,8 @@ def band_scene(film, seg):
     if d.get("band2"):
         t2 = seg.L(d["band2"]["t"])
         body += (f'<div id="{seg.id}-bandw" class="ab" style="left:0;top:{by}px;width:1080px;height:608px;overflow:hidden">'
-                 f'<video id="{seg.id}-b1" class="clip" data-start="0" data-duration="{t2:.3f}" src="{film.a(d["band"])}" muted playsinline style="position:absolute;inset:0;width:1080px;height:608px;object-fit:cover"></video>'
-                 f'<video id="{seg.id}-b2" class="clip" data-start="{t2:.3f}" data-duration="{seg.d - t2:.3f}" src="{film.a(d["band2"]["key"])}" muted playsinline style="position:absolute;inset:0;width:1080px;height:608px;object-fit:cover"></video>'
+                 f'<video id="{seg.id}-b1" class="clip{grade_cls(film, seg)}" data-start="0" data-duration="{t2:.3f}" src="{film.a(d["band"])}" muted playsinline style="position:absolute;inset:0;width:1080px;height:608px;object-fit:cover"></video>'
+                 f'<video id="{seg.id}-b2" class="clip{grade_cls(film, seg)}" data-start="{t2:.3f}" data-duration="{seg.d - t2:.3f}" src="{film.a(d["band2"]["key"])}" muted playsinline style="position:absolute;inset:0;width:1080px;height:608px;object-fit:cover"></video>'
                  f'<div class="ab" style="inset:0;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,0) 18%,rgba(0,0,0,0) 80%,rgba(0,0,0,.75))"></div></div>')
     else:
         body += band(film, seg, d["band"], by, h=bh)
@@ -208,7 +209,7 @@ def band_scene(film, seg):
 
 
 # ================================================================ 3 柱状图
-def bars(film, seg):
+def _bars_main(film, seg):
     """data: title{zh,en}, values[…], labels[…]（可选）, hi[起,止]（高亮区间）, hi_label, hi_t, line{label,t}（持平虚线）, q_t（问号）, bars_t, note。
     风格 chart=paper 时画在白纸立体面板上（瓷蓝），否则是深色底金色柱（其他风格）。"""
     d = seg.data
@@ -333,7 +334,7 @@ def pip_cards(film, seg):
 
 
 # ================================================================ 5 2×2 实拍宫格
-def grid4(film, seg):
+def _grid_2x2(film, seg):
     """data: title{zh,en}, tiles[{key,label,t}]×4, all_t（全部点亮）。"""
     d = seg.data
     bg, s = graphic_bg(film, seg)
@@ -344,7 +345,7 @@ def grid4(film, seg):
         x = 20 + (k % 2) * 528
         y = 440 + (k // 2) * 400
         src = film.a(tdef["key"])
-        media = (f'<video id="{seg.id}-v{k}" class="clip" data-start="0" data-duration="{seg.d:.3f}" src="{src}" muted playsinline style="position:absolute;left:-8px;top:-6px;width:528px;height:396px;object-fit:cover"></video>'
+        media = (f'<video id="{seg.id}-v{k}" class="clip{grade_cls(film, seg)}" data-start="0" data-duration="{seg.d:.3f}" src="{src}" muted playsinline style="position:absolute;left:-8px;top:-6px;width:528px;height:396px;object-fit:cover"></video>'
                  if src.lower().endswith((".mp4", ".mov", ".webm")) else f'<div class="ab" style="inset:0;background:url(\'{src}\') center/cover"></div>')
         html += (f'<div id="{seg.id}-t{k}" class="ab" style="left:{x}px;top:{y}px;width:512px;height:384px;border-radius:10px;overflow:hidden;border:1.5px solid rgba(255,255,255,.14)">{media}'
                  f'<div id="{seg.id}-d{k}" class="ab" style="inset:0;background:rgba(8,8,10,.62)"></div>'
@@ -371,7 +372,7 @@ def grid4(film, seg):
 
 
 # ================================================================ 6 透视编号链
-def chain(film, seg):
+def _chain_list(film, seg):
     """data: title{zh,en}, items[{zh,en,img,t}]（3–5）, stamp{text,en,t}（可选）。rng 决定面板朝向。"""
     d = seg.data
     st = film.st
@@ -386,7 +387,7 @@ def chain(film, seg):
     for k, it in enumerate(items):
         y = top0 + k * gap
         img = asset_or_none(film, it.get("img"))
-        ih = (f'<div class="ab" style="right:0;top:0;width:250px;height:100%;background:url(\'{img}\') center/cover;-webkit-mask:linear-gradient(90deg,transparent,#000 45%)"></div>' if img else "")
+        ih = (f'<div class="ab grade" style="right:0;top:0;width:250px;height:100%;background:url(\'{img}\') center/cover;-webkit-mask:linear-gradient(90deg,transparent,#000 45%)"></div>' if img else "")
         hh = gap - 26
         plates += (f'<div id="{seg.id}-p{k}" class="card" style="left:66px;top:{y}px;width:560px;height:{hh}px">{ih}<div class="dash"></div><div id="{seg.id}-p{k}-g" class="glow"></div>'
                    f'<div class="ab k" style="left:26px;top:{hh / 2 - 56:.0f}px">{k + 1}</div>'
@@ -409,7 +410,7 @@ def chain(film, seg):
           + sway(f"#{seg.id}-pf", seg.d, 3, 4.8, 0.7) + ps)
     for k in range(n):
         s += f'tl.fromTo("#{seg.id}-p{k}",{{opacity:0,filter:"blur(6px)"}},{{opacity:0.38,filter:"blur(3px)",duration:0.1}},0.0);\n'
-    times = seg.times(items, first=0.8)
+    times = [max(0.15, t) for t in seg.times(items, first=0.8)]
     for k, t in enumerate(times):
         s += (f'tl.to("#{seg.id}-p{k}",{{opacity:1,filter:"blur(0px)",x:-14,duration:0.3,ease:"power3.out"}},{t:.3f});\n'
               f'tl.to("#{seg.id}-p{k}",{{x:0,duration:0.35,ease:"power2.out"}},{t + 0.3:.3f});\n'
@@ -429,7 +430,7 @@ def chain(film, seg):
 
 
 # ================================================================ 7 斜向层叠卡片
-def cascade(film, seg):
+def _cascade_diag(film, seg):
     """data: title{zh,en}, items[{zh,en,img,t}]（3–4）, line{label}（可选，背景一条上升线）。"""
     d = seg.data
     st = film.st
@@ -561,7 +562,7 @@ def pband(seg, k, cx, cy, rx, ry, rgb, n=170, seed=5):
         dots.append(f'<i style="left:{x:.0f}px;top:{y:.0f}px;width:{sz:.1f}px;height:{sz:.1f}px;opacity:{0.25 + next(g) * 0.7:.2f}"></i>')
     glow = (f'<div class="ab" style="left:{cx - rx * 1.1:.0f}px;top:{cy - ry * 1.6:.0f}px;width:{rx * 2.2:.0f}px;height:{ry * 3.2:.0f}px;'
             f'background:radial-gradient(ellipse at 50% 50%,rgba({rgb},.40),rgba({rgb},.10) 45%,transparent 70%)"></div>')
-    return (f'<div id="{seg.id}-pb{k}" class="ab" style="inset:0">{glow}' + "".join(dots) + "</div>",
+    return (f'<div id="{seg.id}-pb{k}" class="ab" data-layout-ignore style="inset:0">{glow}' + "".join(dots) + "</div>",
             f"#{seg.id}-pb{k} i{{position:absolute;border-radius:50%;background:rgba({rgb},1);box-shadow:0 0 6px rgba({rgb},.9)}}")
 
 
@@ -577,13 +578,13 @@ def quote(film, seg):
     s = ""
     argb = st.c.get("argb", "255,196,140")
     if mode == "particles":
-        bgv = (f'<video id="{seg.id}-bgv" class="clip" data-start="0" data-duration="{seg.d:.3f}" src="{film.a(d["video"])}" muted playsinline style="position:absolute;inset:0;width:1080px;height:1920px;object-fit:cover"></video>'
+        bgv = (f'<video id="{seg.id}-bgv" class="clip{grade_cls(film, seg)}" data-start="0" data-duration="{seg.d:.3f}" src="{film.a(d["video"])}" muted playsinline style="position:absolute;inset:0;width:1080px;height:1920px;object-fit:cover"></video>'
                if d.get("video") else "")
         p1, c1 = pband(seg, 1, 540, 640, 380, 60, argb)
         p2, c2 = pband(seg, 2, 540, 1110, 380, 60, argb)
         css = c1 + c2
         body = (f'<div class="bgbase"></div>{bgv}'
-                f'<div id="{seg.id}-rays" class="ab" style="left:-420px;top:-420px;width:1920px;height:2760px;background:repeating-conic-gradient(from 0deg at 50% 46%,rgba({argb},.16) 0deg 1.4deg,transparent 1.4deg 8deg);-webkit-mask:radial-gradient(circle at 50% 46%,transparent 16%,#000 58%)"></div>'
+                f'<div id="{seg.id}-rays" class="ab" data-layout-ignore style="left:-420px;top:-420px;width:1920px;height:2760px;background:repeating-conic-gradient(from 0deg at 50% 46%,rgba({argb},.16) 0deg 1.4deg,transparent 1.4deg 8deg);-webkit-mask:radial-gradient(circle at 50% 46%,transparent 16%,#000 58%)"></div>'
                 f'<div class="ab" style="inset:0;background:radial-gradient(circle at 50% 46%,rgba(0,0,0,0) 8%,rgba(0,0,0,.78) 72%)"></div>{p1}{p2}')
         s += (f'tl.fromTo("#{seg.id}-rays",{{rotation:0}},{{rotation:12,duration:{seg.d:.2f},ease:"none"}},0);\n'
               f'tl.fromTo("#{seg.id}-pb1",{{opacity:0,scale:0.9}},{{opacity:1,scale:1.06,duration:{seg.d:.2f},ease:"none"}},0);\n'
@@ -635,18 +636,18 @@ def quote(film, seg):
     big_cls = "TB" if mode == "brush" else d.get("cls1", "T1")
     rv = d.get("reveal") == "chars"
     fs1 = d.get("fs1") or min(190 if mode == "brush" else 150, fit_fs(d["big1"], 980, 190 if mode == "brush" else 150))
-    body += (f'<div id="{seg.id}-lab1" class="head" style="top:{y_lab}px"><h2 style="font-size:{56 if mode != "banner" else 48}px">{rich(d.get("lab1", ""))}</h2><p>{rich(d.get("en1", ""))}</p></div>'
-             f'<div id="{seg.id}-big1" class="ab {"" if rv else big_cls}" style="left:0;right:0;top:{y_big}px;text-align:center;font-size:{fs1}px;line-height:1.05;letter-spacing:{10 if mode == "brush" else 6}px;opacity:0">{chars(d["big1"], big_cls) if rv else rich(d["big1"])}</div>')
+    body += (f'<div id="{seg.id}-lab1" data-layout-allow-overlap class="head" style="top:{y_lab}px"><h2 style="font-size:{56 if mode != "banner" else 48}px">{rich(d.get("lab1", ""))}</h2><p>{rich(d.get("en1", ""))}</p></div>'
+             f'<div id="{seg.id}-big1" data-layout-allow-overlap class="ab {"" if rv else big_cls}" style="left:0;right:0;top:{y_big}px;text-align:center;font-size:{fs1}px;line-height:1.05;letter-spacing:{10 if mode == "brush" else 6}px;opacity:0">{chars(d["big1"], big_cls) if rv else rich(d["big1"])}</div>')
     if not d.get("lab1"):
-        body = body.replace(f'<div id="{seg.id}-lab1" class="head"', f'<div id="{seg.id}-lab1" class="head" data-empty="1"', 1)
+        body = body.replace(f'<div id="{seg.id}-lab1" class="head"', f'<div id="{seg.id}-lab1" data-layout-allow-overlap class="head" data-empty="1"', 1)
     if d.get("big2"):
         fs2 = d.get("fs2") or min(190 if mode == "brush" else 170, fit_fs(d["big2"], 980, 190 if mode == "brush" else 170))
         cls2 = "TB" if mode == "brush" else d.get("cls2", "T2")
-        body += (f'<div id="{seg.id}-lab2" class="head" style="top:{y_lab}px;opacity:0"><h2 style="font-size:{56 if mode != "banner" else 48}px">{rich(d.get("lab2", ""))}</h2><p>{rich(d.get("en2", ""))}</p></div>'
-                 f'<div id="{seg.id}-big2" class="ab {"" if rv else cls2}" style="left:0;right:0;top:{y_big}px;text-align:center;font-size:{fs2}px;line-height:1.05;letter-spacing:6px;opacity:0">{chars(d["big2"], cls2) if rv else rich(d["big2"])}</div>')
+        body += (f'<div id="{seg.id}-lab2" data-layout-allow-overlap class="head" style="top:{y_lab}px;opacity:0"><h2 style="font-size:{56 if mode != "banner" else 48}px">{rich(d.get("lab2", ""))}</h2><p>{rich(d.get("en2", ""))}</p></div>'
+                 f'<div id="{seg.id}-big2" data-layout-allow-overlap class="ab {"" if rv else cls2}" style="left:0;right:0;top:{y_big}px;text-align:center;font-size:{fs2}px;line-height:1.05;letter-spacing:6px;opacity:0">{chars(d["big2"], cls2) if rv else rich(d["big2"])}</div>')
     s += f'tl.fromTo("#{seg.id}-lab1",{{opacity:0,y:20}},{{opacity:1,y:0,duration:0.4,ease:"power3.out"}},0.05);\n'
     if rv:
-        s += chars_in(f"#{seg.id}-big1", t1, len(plain(d["big1"])), d.get("per", 0.07))
+        s += chars_in(f"#{seg.id}-big1", t1, len(plain(d["big1"])), d.get("per") or film.reveal_per(d["big1"], seg))
     else:
         s += brush_in(st, f"#{seg.id}-big1", t1) if mode == "brush" else st.title_in(f"#{seg.id}-big1", t1)
     film.sfx_at(seg, t1, "impact" if mode != "banner" else "whoosh")
@@ -655,7 +656,7 @@ def quote(film, seg):
         s += (f'tl.to(["#{seg.id}-big1","#{seg.id}-lab1"],{{opacity:0,y:-30,duration:0.3,ease:"power2.in"}},{t2 - 0.2:.3f});\n'
               f'tl.fromTo("#{seg.id}-lab2",{{opacity:0,y:20}},{{opacity:1,y:0,duration:0.35,ease:"power3.out"}},{t2:.3f});\n')
         if rv:
-            s += chars_in(f"#{seg.id}-big2", t2 + 0.25, len(plain(d["big2"])), d.get("per", 0.07))
+            s += chars_in(f"#{seg.id}-big2", t2 + 0.25, len(plain(d["big2"])), d.get("per") or film.reveal_per(d["big2"], seg))
         else:
             s += brush_in(st, f"#{seg.id}-big2", t2 + 0.25) if mode == "brush" else st.title_in(f"#{seg.id}-big2", t2 + 0.25)
         film.sfx_at(seg, t2 + 0.25, "impact", 0.2)
@@ -685,7 +686,7 @@ def chapter(film, seg):
                 f'<div class="ab" style="left:{k * 150}px;top:0;width:120px;height:120px;border-radius:14px;background:linear-gradient(180deg,#5A3A2A,#2E1D14);'
                 f'box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 10px 20px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center">'
                 f'{icon(names[k % len(names)], 64, st.c["a"], 1.8)}</div>' for k in range(16))
-            return f'<div id="{rid}" class="ab" style="left:-150px;top:{y}px;width:2400px;height:120px">{cells}</div>'
+            return f'<div id="{rid}" class="ab" data-layout-ignore style="left:-150px;top:{y}px;width:2400px;height:120px">{cells}</div>'
         body += row(f"{seg.id}-r1", 300) + row(f"{seg.id}-r2", 1120)
         body += (f'<div id="{seg.id}-tt" class="ab T1" style="left:0;right:0;top:{700 - fs / 2:.0f}px;text-align:center;font-size:{fs}px;line-height:1;letter-spacing:0.08em;opacity:0">{rich(zh)}</div>'
                  f'<div id="{seg.id}-en" class="ab EN" style="left:0;right:0;top:{720 + fs / 2:.0f}px;text-align:center;opacity:0">{rich(d.get("en", ""))}</div>')
@@ -743,7 +744,7 @@ def chapter(film, seg):
         s += "".join(f'tl.fromTo("#{seg.id}-h{k}",{{scale:0.6,rotation:0}},{{scale:1,rotation:{(-1) ** k * 60},duration:{seg.d:.2f},ease:"power1.out"}},0);\n' for k in range(3))
         s += st.title_in(f"#{seg.id}-tt", t) + st.sub_in(f"#{seg.id}-en", t + 0.4)
     else:  # orn：金属大字＋纹饰
-        body += (f'<div id="{seg.id}-rays" class="ab" style="left:-420px;top:-500px;width:1920px;height:2600px;background:repeating-conic-gradient(from 0deg at 50% 46%,rgba({st.c.get("argb", "242,178,122")},.12) 0deg 1.4deg,transparent 1.4deg 8deg);-webkit-mask:radial-gradient(circle at 50% 46%,transparent 14%,#000 60%)"></div>'
+        body += (f'<div id="{seg.id}-rays" class="ab" data-layout-ignore style="left:-420px;top:-500px;width:1920px;height:2600px;background:repeating-conic-gradient(from 0deg at 50% 46%,rgba({st.c.get("argb", "242,178,122")},.12) 0deg 1.4deg,transparent 1.4deg 8deg);-webkit-mask:radial-gradient(circle at 50% 46%,transparent 14%,#000 60%)"></div>'
                  f'<div id="{seg.id}-head" class="head" style="top:{560 - fs / 2:.0f}px"><div class="orn"><i></i><s></s><i class="r"></i></div></div>'
                  f'<div id="{seg.id}-tt" class="ab T1" style="left:0;right:0;top:{620 - fs / 2:.0f}px;text-align:center;font-size:{fs}px;line-height:1;letter-spacing:10px;opacity:0">{rich(zh)}</div>'
                  f'<div id="{seg.id}-en" class="ab EN" style="left:0;right:0;top:{650 + fs / 2:.0f}px;text-align:center;opacity:0">{rich(d.get("en", ""))}</div>')
@@ -776,7 +777,7 @@ def logo_wall(film, seg):
         fs = min(46, fit_fs(nm, tw_ - 40, 46, 22))
         tiles += (f'<div id="{seg.id}-t{k}" class="paper" style="left:{x}px;top:{y}px;width:{tw_}px;height:{th}px;border-radius:12px;display:flex;align-items:center;justify-content:center;'
                   f'text-align:center;font:{"600" if f == "EN" else "400"} {fs}px/1.1 {f},SM;color:#1E2A3A;letter-spacing:1px;padding:0 16px">{rich(nm)}</div>')
-    body = bg + f'<div id="{seg.id}-wall" class="ab" style="left:-30px;top:0;width:1140px;height:1576px">{tiles}</div>'
+    body = bg + f'<div id="{seg.id}-wall" class="ab" data-layout-allow-overflow style="left:-30px;top:0;width:1140px;height:1576px">{tiles}</div>'
     ph, ps = put_pip(film, seg, pip_spec(film, seg, ("rect", 360, 120, 360, 440)), 0.1, 6)
     body += ph
     t0 = seg.at("t", 0.3)
@@ -812,7 +813,7 @@ def doc(film, seg):
         hl_html = rich(hl)
     lines = "".join(f'<div style="font:400 34px/1.7 SR,serif;color:#3A3530">{rich(l)}</div>' for l in d.get("lines", []))
     fs = min(68, fit_fs(hl, 900, 68))
-    body = bg + (f'<div id="{seg.id}-pf" class="fl" style="left:-40px;top:300px;width:1160px;height:820px">'
+    body = bg + (f'<div id="{seg.id}-pf" class="fl" data-layout-allow-overflow style="left:-40px;top:300px;width:1160px;height:820px">'
                  f'<div id="{seg.id}-pp" class="paper" style="left:0;top:0;width:1160px;height:820px;padding:90px 110px;isolation:isolate">'
                  f'<div style="font:600 22px/1 EN,Inter;letter-spacing:3px;color:#9A8F80;margin-bottom:40px">{rich(d.get("source", ""))}</div>'
                  f'<div style="font:400 {fs}px/1.3 SM;color:#16120E;position:relative;z-index:1">{hl_html}</div>'
@@ -832,7 +833,7 @@ def doc(film, seg):
 
 
 # ================================================================ 13 两段对比（A vs B）
-def compare(film, seg):
+def _compare_side(film, seg):
     """data: title{zh,en}（可选）, a{label,value,icon,n}, b{label,value,icon,n}, t_a, t_b, mult{text,t}（倍数大字，可选）。"""
     d = seg.data
     st = film.st
@@ -1008,7 +1009,7 @@ def ending(film, seg):
     fs1 = min(150 if mode == "brush" else 96, fit_fs(d["big1"], 960, 150 if mode == "brush" else 96))
     fs2 = min(200 if mode == "brush" else 176, fit_fs(d["big2"], 960, 200 if mode == "brush" else 176))
     if d.get("pre"):
-        body += f'<div id="{seg.id}-pre" class="head" style="top:640px"><h2 style="font-size:56px">{rich(d["pre"]["zh"])}</h2><p>{rich(d["pre"].get("en", ""))}</p></div>'
+        body += f'<div id="{seg.id}-pre" data-layout-allow-overlap class="head" style="top:640px"><h2 style="font-size:56px">{rich(d["pre"]["zh"])}</h2><p>{rich(d["pre"].get("en", ""))}</p></div>'
         s += f'tl.fromTo("#{seg.id}-pre",{{opacity:0,y:20}},{{opacity:1,y:0,duration:0.4,ease:"power3.out"}},0.05);\ntl.to("#{seg.id}-pre",{{opacity:0,duration:0.3}},{t1 - 0.2:.3f});\n'
     rv = d.get("reveal") == "chars"
     body += (f'<div id="{seg.id}-b1" class="ab {"" if rv else cls1}" style="left:0;right:0;top:{800 - fs1:.0f}px;text-align:center;font-size:{fs1}px;line-height:1.1;letter-spacing:6px;opacity:0">{chars(d["big1"], cls1) if rv else rich(d["big1"])}</div>'
@@ -1019,7 +1020,7 @@ def ending(film, seg):
              f'<div class="EN" style="margin-top:22px">{rich(d.get("tagline", ""))}</div></div>')
     for bid, txt, tt in ((f"{seg.id}-b1", d["big1"], t1), (f"{seg.id}-b2", d["big2"], t2)):
         if rv:
-            s += chars_in(f"#{bid}", tt, len(plain(txt)), d.get("per", 0.08))
+            s += chars_in(f"#{bid}", tt, len(plain(txt)), d.get("per") or film.reveal_per(txt, seg, 0.08))
         else:
             s += brush_in(st, f"#{bid}", tt) if mode == "brush" else st.title_in(f"#{bid}", tt)
     ph, ps = put_pip(film, seg, pip_spec(film, seg, ("circle", 770, 250, 270, 270) if st.pip["shape"] != "rect" else ("rect", 810, 220, 230, 290)), 0.2, 10)
@@ -1031,6 +1032,230 @@ def ending(film, seg):
     seg.cap_y_set = 1180
     css += ".badge{height:64px;padding:0 36px;font-size:42px;line-height:64px}"
     film.scene(seg.id, body, s, css)
+
+
+# ================================================================ 版式变体（同一版式的不同排法，按内容自动选，data.variant 可指定）
+def _variant(film, seg, auto, choices):
+    v = seg.data.get("variant")
+    if v in choices:
+        return v
+    return auto
+
+
+def _pip_low(film, seg):
+    """变体用的小窗：放在左下或居中下方，不挡主体。"""
+    shp = film.st.pip["shape"]
+    if shp == "rect":
+        return ("rect", 30, 1040, 230, 290)
+    if shp == "squircle":
+        return ("squircle", (W - 260) / 2, 1080, 260, 260)
+    return (shp, 30, 1050, 260, 260)
+
+
+def chain(film, seg):
+    """编号链两种排法：list 竖向透视面板（默认）／steps 横向步骤（条目 ≤3 且都很短时自动用）。"""
+    items = seg.data["items"]
+    auto = "steps" if len(items) <= 3 and all(tw(it["zh"]) <= 5 for it in items) else "list"
+    if _variant(film, seg, auto, ("list", "steps")) == "list":
+        return _chain_list(film, seg)
+    d = seg.data
+    st = film.st
+    n = len(items)
+    bg, s = graphic_bg(film, seg)
+    body = bg + header(film, seg, d["title"]["zh"], d["title"]["en"])
+    gap = 44
+    cw = (W - 80 - gap * (n - 1)) / n
+    ch = 470
+    y0 = 470
+    times = seg.times(items, first=0.8)
+    for k, it in enumerate(items):
+        x = 40 + k * (cw + gap)
+        img = asset_or_none(film, it.get("img"))
+        ih = (f'<div class="ab grade" style="left:0;top:0;right:0;height:200px;background:url(\'{img}\') center/cover;'
+              f'-webkit-mask:linear-gradient(180deg,#000 55%,transparent)"></div>') if img else ""
+        fs = min(56, fit_fs(it["zh"], cw - 50, 56))
+        body += (f'<div id="{seg.id}-s{k}f" class="fl" style="left:{x:.0f}px;top:{y0}px;width:{cw:.0f}px;height:{ch}px">'
+                 f'<div id="{seg.id}-s{k}" class="card" style="left:0;top:0;width:{cw:.0f}px;height:{ch}px;opacity:0">{ih}<div class="dash"></div>'
+                 f'<div id="{seg.id}-s{k}-g" class="glow"></div>'
+                 f'<div class="ab k" style="left:26px;top:150px">{k + 1}</div>'
+                 f'<div class="ab t" style="left:28px;right:20px;top:290px;font-size:{fs}px">{rich(it["zh"])}</div>'
+                 f'<div class="ab e" style="left:30px;top:{300 + fs * 1.2:.0f}px;margin:0">{rich(it.get("en", ""))}</div></div></div>')
+        if k < n - 1:
+            ax = x + cw + 6
+            body += (f'<svg id="{seg.id}-a{k}" class="ab" style="left:{ax:.0f}px;top:{y0 + ch / 2 - 22:.0f}px;opacity:0" width="32" height="44">'
+                     f'<polyline points="4,4 26,22 4,40" fill="none" stroke="{st.c["a"]}" stroke-width="5" stroke-linecap="round"/></svg>')
+    ph, ps = put_pip(film, seg, pip_spec(film, seg, _pip_low(film, seg)))
+    body += ph
+    s += head_in(film, seg) + ps
+    for k, t in enumerate(times):
+        s += st.card_in(f"#{seg.id}-s{k}", t, k, film.rng(seg, k), "up") + f'tl.fromTo("#{seg.id}-s{k}-g",{{opacity:0}},{{opacity:1,duration:0.3}},{t + 0.1:.3f});\n'
+        if k > 0:
+            s += (f'tl.to("#{seg.id}-s{k - 1}-g",{{opacity:0.3,duration:0.3}},{t:.3f});\n'
+                  f'tl.fromTo("#{seg.id}-a{k - 1}",{{opacity:0,x:-14}},{{opacity:1,x:0,duration:0.3}},{t - 0.15:.3f});\n')
+        s += floaty(f"#{seg.id}-s{k}f", seg.d, 7, 3.4, k * 0.6)
+        film.sfx_at(seg, t, "snap")
+    seg.cap_y_set = CAP_Y
+    film.scene(seg.id, body, s)
+
+
+def bars(film, seg):
+    """柱状图两种排法：vertical 竖柱（默认）／horizontal 横向排名条（给了较长的类别名时自动用）。"""
+    d = seg.data
+    labels = d.get("labels") or []
+    auto = "horizontal" if labels and max(tw(x) for x in labels) > 2 else "vertical"
+    if _variant(film, seg, auto, ("vertical", "horizontal")) == "vertical":
+        return _bars_main(film, seg)
+    st = film.st
+    vals = d["values"]
+    n = len(vals)
+    vmax = max(vals)
+    bg, s = graphic_bg(film, seg)
+    body = bg + header(film, seg, d["title"]["zh"], d["title"]["en"])
+    row = min(92, 640 / n)
+    y0 = 420
+    a = st.c["a"]
+    rows = ""
+    for k, v in enumerate(vals):
+        y = y0 + k * row
+        w = 600 * v / vmax
+        hi = d.get("hi") and d["hi"][0] <= k <= d["hi"][1]
+        lab = labels[k] if k < len(labels) else ""
+        unit = d.get("unit", "")
+        rows += (f'<div class="ab" style="left:40px;top:{y + row * 0.18:.0f}px;width:290px;text-align:right;font:400 {min(40, row * 0.5):.0f}px/1.2 SM;color:#F4F0EA">{rich(lab)}</div>'
+                 f'<div id="{seg.id}-h{k}" class="ab" style="left:350px;top:{y + row * 0.12:.0f}px;width:{w:.0f}px;height:{row * 0.62:.0f}px;border-radius:0 8px 8px 0;transform-origin:0 50%;'
+                 f'background:linear-gradient(90deg,{a}55,{a if hi else a + "AA"});box-shadow:{"0 0 24px " + a + "88" if hi else "none"}"></div>'
+                 f'<div id="{seg.id}-v{k}" class="ab numt" style="left:{360 + w:.0f}px;top:{y + row * 0.16:.0f}px;font-size:{min(40, row * 0.5):.0f}px;opacity:0">{v:g}{esc(unit)}</div>')
+    body += rows + f'<div class="note" style="right:60px;top:{y0 + n * row + 20:.0f}px">{esc(d.get("note", NOTE))}</div>'
+    ph, ps = put_pip(film, seg, pip_spec(film, seg, _pip_low(film, seg)))
+    body += ph
+    s += head_in(film, seg) + ps
+    bt0 = seg.at("bars_t", 0.6)
+    for k in range(n):
+        tk = bt0 + k * 0.14
+        s += (f'tl.fromTo("#{seg.id}-h{k}",{{scaleX:0}},{{scaleX:1,duration:0.5,ease:"power3.out"}},{tk:.2f});\n'
+              f'tl.fromTo("#{seg.id}-v{k}",{{opacity:0}},{{opacity:1,duration:0.3}},{tk + 0.35:.2f});\n')
+    film.sfx_at(seg, bt0, "swoosh")
+    seg.cap_y_set = CAP_Y
+    film.scene(seg.id, body, s)
+
+
+def compare(film, seg):
+    """对比两种排法：side 左右两块（默认）／stacked 上下两块（数值文字较长时自动用）。"""
+    d = seg.data
+    auto = "stacked" if max(tw(d["a"]["value"]), tw(d["b"]["value"])) > 5 else "side"
+    if _variant(film, seg, auto, ("side", "stacked")) == "side":
+        return _compare_side(film, seg)
+    st = film.st
+    rng = film.rng(seg)
+    bg, s = graphic_bg(film, seg)
+    body = bg
+    top = 380
+    if d.get("title"):
+        body += header(film, seg, d["title"]["zh"], d["title"]["en"], 150)
+        s += head_in(film, seg)
+    for k, key in enumerate(("a", "b")):
+        p = d[key]
+        y = top + k * 330
+        n = int(p.get("n", 4 if k == 0 else 12))
+        icons = "".join(f'<div class="ab" style="left:{40 + i * 64}px;top:210px">{icon(p.get("icon", "package"), 54, st.c["a"], 1.8)}</div>' for i in range(min(n, 14)))
+        fsv = min(96, fit_fs(p["value"], 700, 96))
+        body += (f'<div id="{seg.id}-{key}f" class="fl" style="left:40px;top:{y}px;width:1000px;height:300px">'
+                 f'<div id="{seg.id}-{key}" class="card" style="left:0;top:0;width:1000px;height:300px;opacity:0"><div class="dash"></div><div id="{seg.id}-{key}-g" class="glow"></div>'
+                 f'<div class="ab" style="left:40px;top:34px;font:400 38px/1 SM;opacity:.8">{rich(p["label"])}</div>'
+                 f'<div class="ab numt" style="left:260px;top:{100 - fsv / 2:.0f}px;font-size:{fsv}px">{rich(p["value"])}</div>{icons}</div></div>')
+    if d.get("mult"):
+        body += f'<div id="{seg.id}-m" class="ab T1" style="left:0;right:0;top:1030px;text-align:center;font-size:110px;line-height:1;opacity:0">{rich(d["mult"]["text"])}</div>'
+    shp = st.pip["shape"]
+    low = {"rect": ("rect", 30, 1150, 210, 260), "squircle": ("squircle", (W - 220) / 2, 1290, 220, 220)}.get(shp, (shp, 36, 1170, 230, 230))
+    ph, ps = put_pip(film, seg, pip_spec(film, seg, low))
+    body += ph
+    ta, tb = seg.at("t_a", 0.3), seg.at("t_b", seg.d * 0.45)
+    s += st.card_in(f"#{seg.id}-a", ta, 0, rng, "left") + f'tl.fromTo("#{seg.id}-a-g",{{opacity:0}},{{opacity:1,duration:0.3}},{ta + 0.3:.3f});\n'
+    s += st.card_in(f"#{seg.id}-b", tb, 1, rng, "right") + f'tl.fromTo("#{seg.id}-b-g",{{opacity:0}},{{opacity:1,duration:0.3}},{tb + 0.3:.3f});\n'
+    s += f'tl.to("#{seg.id}-a-g",{{opacity:0,duration:0.3}},{tb:.3f});\n'
+    s += floaty(f"#{seg.id}-af", seg.d, 7, 3.4, 0) + floaty(f"#{seg.id}-bf", seg.d, 7, 3.4, 1.1) + ps
+    film.sfx_at(seg, ta, "swoosh"); film.sfx_at(seg, tb, "swoosh")
+    if d.get("mult"):
+        mt = seg.at_t(d["mult"], tb + 1.0)
+        s += st.title_in(f"#{seg.id}-m", mt)
+        film.sfx_at(seg, mt, "impact")
+    seg.cap_y_set = 1330 if st.key != "kuangshi" else 1180
+    film.scene(seg.id, body, s)
+
+
+def grid4(film, seg):
+    """宫格两种排法：grid 2×2（默认之一）／hero 一大三小（第一格是主画面）。没指定时按种子二选一。"""
+    rng = film.rng(seg, "variant")
+    auto = "hero" if (seg.data.get("tiles") and seg.data["tiles"][0].get("hero")) or rng.random() < 0.5 else "grid"
+    if _variant(film, seg, auto, ("grid", "hero")) == "grid":
+        return _grid_2x2(film, seg)
+    d = seg.data
+    bg, s = graphic_bg(film, seg)
+    tiles = d["tiles"][:4]
+    a = film.st.c["a"]
+    boxes = [(20, 430, 1040, 520)] + [(20 + i * 352, 970, 336, 252) for i in range(3)]
+    html = ""
+    for k, tdef in enumerate(tiles):
+        x, y, w, h = boxes[k]
+        src = film.a(tdef["key"])
+        media = (f'<video id="{seg.id}-v{k}" class="clip{grade_cls(film, seg)}" data-start="0" data-duration="{seg.d:.3f}" src="{src}" muted playsinline style="position:absolute;inset:0;width:{w}px;height:{h}px;object-fit:cover"></video>'
+                 if src.lower().endswith((".mp4", ".mov", ".webm")) else f'<div class="ab grade" style="inset:0;background:url(\'{src}\') center/cover"></div>')
+        html += (f'<div id="{seg.id}-t{k}" class="ab" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px;border-radius:10px;overflow:hidden;border:1.5px solid rgba(255,255,255,.14)">{media}'
+                 f'<div id="{seg.id}-d{k}" class="ab" style="inset:0;background:rgba(8,8,10,.6)"></div>'
+                 f'<div id="{seg.id}-k{k}" class="ab" style="inset:-1px;border-radius:10px;border:3px solid {a};box-shadow:inset 0 0 30px {a}55;opacity:0"></div>'
+                 f'<div id="{seg.id}-l{k}" class="card" style="left:16px;bottom:16px;height:{64 if k else 80}px;padding:{10 if k else 14}px 18px;border-radius:12px;opacity:0">'
+                 f'<div class="t" style="font-size:{34 if k else 46}px;white-space:nowrap">{rich(tdef["label"])}</div></div></div>')
+    body = bg + header(film, seg, d["title"]["zh"], d["title"]["en"]) + html
+    shp = film.st.pip["shape"]
+    ph, ps = put_pip(film, seg, pip_spec(film, seg, (shp, 806, 250, 240, 240) if shp != "rect" else ("rect", 830, 220, 210, 260)))
+    body += ph
+    s += head_in(film, seg) + ps
+    s += f'tl.fromTo([{",".join(chr(34) + "#" + seg.id + "-t" + str(k) + chr(34) for k in range(len(tiles)))}],{{opacity:0,y:30}},{{opacity:1,y:0,duration:0.45,stagger:0.1,ease:"power3.out"}},0.15);\n'
+    for k, t in enumerate(seg.times(tiles, first=0.8)):
+        s += (f'tl.to("#{seg.id}-d{k}",{{opacity:0,duration:0.3}},{t:.3f});\n'
+              f'tl.fromTo("#{seg.id}-k{k}",{{opacity:0}},{{opacity:1,duration:0.25}},{t:.3f});\n'
+              f'tl.fromTo("#{seg.id}-l{k}",{{opacity:0,y:16}},{{opacity:1,y:0,duration:0.3,ease:"back.out(1.8)"}},{t + 0.05:.3f});\n')
+        if k > 0:
+            s += f'tl.to("#{seg.id}-k{k - 1}",{{opacity:0.35,duration:0.3}},{t:.3f});\n'
+        film.sfx_at(seg, t, "snap")
+    seg.cap_y_set = CAP_Y
+    film.scene(seg.id, body, s)
+
+
+def cascade(film, seg):
+    """层叠卡两种排法：diagonal 斜向一路落下（默认之一）／zigzag 左右交错、各自倾斜。没指定时按种子二选一。"""
+    rng = film.rng(seg, "variant")
+    auto = "zigzag" if rng.random() < 0.45 else "diagonal"
+    if _variant(film, seg, auto, ("diagonal", "zigzag")) == "diagonal":
+        return _cascade_diag(film, seg)
+    d = seg.data
+    st = film.st
+    items = d["items"][:4]
+    bg, s = graphic_bg(film, seg)
+    body = bg + header(film, seg, d["title"]["zh"], d["title"]["en"])
+    rots = [-5, 4, -3, 5]
+    for k, it in enumerate(items):
+        x = 40 if k % 2 == 0 else W - 40 - 640
+        body += card_img(f"{seg.id}-q{k}", x, 400 + k * 220, 640, 210, it["zh"], it.get("en", ""), asset_or_none(film, it.get("img")), num=f"0{k + 1}", fs=48)
+    last_left = (len(items) - 1) % 2 == 0
+    shp = st.pip["shape"]
+    pw = 230 if shp == "rect" else 240
+    px = W - 40 - pw if last_left else 40
+    py = 400 + len(items) * 220 + 20
+    ph, ps = put_pip(film, seg, pip_spec(film, seg, (shp, px, py, pw, 290 if shp == "rect" else pw)))
+    body += ph
+    s += head_in(film, seg) + ps
+    for k, t in enumerate(seg.times(items, first=0.8)):
+        r = rots[k % 4]
+        dx = -160 if k % 2 == 0 else 160
+        s += (f'tl.fromTo("#{seg.id}-q{k}",{{opacity:0,x:{dx},rotation:{r * 3}}},{{opacity:1,x:0,rotation:{r},duration:0.55,ease:"back.out(1.4)"}},{t - 0.1:.3f});\n'
+              f'tl.fromTo("#{seg.id}-q{k}-g",{{opacity:0}},{{opacity:1,duration:0.25}},{t + 0.2:.3f});\n')
+        if k > 0:
+            s += f'tl.to("#{seg.id}-q{k - 1}-g",{{opacity:0,duration:0.3}},{t:.3f});\n'
+        s += floaty(f"#{seg.id}-q{k}f", seg.d, 7, 3.2, k * 0.6)
+        film.sfx_at(seg, t - 0.1, "swoosh")
+    seg.cap_y_set = 1330
+    film.scene(seg.id, body, s)
 
 
 GRAPHIC_LAYOUTS = {

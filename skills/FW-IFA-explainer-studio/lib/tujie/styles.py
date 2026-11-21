@@ -190,6 +190,7 @@ class Tanjin(Style):
 .motifc{color:rgba(%(argb)s,.10)}
 .chip{color:%(a)s}
 .hl{color:%(hi)s;-webkit-text-fill-color:%(hi)s;text-shadow:0 0 18px rgba(%(argb)s,.6)}
+.grade{filter:contrast(1.06) saturate(.86) brightness(.95)}.gradeov{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,170,90,.14),rgba(20,10,0,.22));mix-blend-mode:soft-light}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,#141213 0%%,#0C0B0C 38%%,#070707 100%%)}
 .dkg{position:absolute;left:290px;top:1576px;width:500px;height:170px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.20),transparent 70%%)}
@@ -252,6 +253,7 @@ class Dangan(Style):
 .seal{position:absolute;width:150px;height:150px;border-radius:50%%;background:radial-gradient(circle at 38%% 32%%,#F07A3A,#C2361A 55%%,#8E220E);box-shadow:0 6px 14px rgba(0,0,0,.5),inset 0 -6px 12px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font:400 46px/1 SR;color:rgba(255,236,220,.92);letter-spacing:2px}
 .streak{position:absolute;left:0;right:0;overflow:hidden;background:linear-gradient(90deg,#1A0610,#3A0C22 30%%,#2A0818 70%%,#12040A)}
 .hl{color:%(m)s;-webkit-text-fill-color:%(m)s}
+.grade{filter:sepia(.3) saturate(.72) contrast(1.08) brightness(.9)}.gradeov{position:absolute;inset:0;pointer-events:none;background:rgba(120,70,30,.2);mix-blend-mode:multiply}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,#17110E,#0D0907)}
 .dkg{position:absolute;left:240px;top:1576px;width:600px;height:150px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.16),transparent 70%%)}
@@ -315,6 +317,7 @@ class Kuangshi(Style):
 .chip{color:%(a)s}
 .ruler{position:absolute;left:0;right:0;height:44px}
 .hl{color:#FFD66B;-webkit-text-fill-color:#FFD66B;text-shadow:0 0 16px rgba(%(argb)s,.6)}
+.grade{filter:grayscale(.42) contrast(1.14) brightness(.9)}.gradeov{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(230,195,106,.16),rgba(0,0,0,.24));mix-blend-mode:soft-light}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,rgba(14,13,12,.86),rgba(8,8,8,.95)),url('%(tex_stone)s') center/cover}
 .dkg{position:absolute;left:290px;top:1576px;width:500px;height:150px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.18),transparent 70%%)}
@@ -377,6 +380,7 @@ class Cilan(Style):
 .chip{color:%(lt)s}
 .hud{position:absolute;border-radius:50%%;border:3px solid rgba(%(argb)s,.85);box-shadow:0 0 30px rgba(%(argb)s,.6),inset 0 0 30px rgba(%(argb)s,.35)}
 .hl{color:%(li)s;-webkit-text-fill-color:%(li)s}
+.grade{filter:saturate(.8) contrast(.96) brightness(1.05)}.gradeov{position:absolute;inset:0;pointer-events:none;background:rgba(110,145,255,.18);mix-blend-mode:soft-light}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,#18202B,#0E131A)}
 .dkg{position:absolute;left:290px;top:1576px;width:500px;height:150px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.22),transparent 70%%)}
@@ -438,6 +442,7 @@ class Nihong(Style):
 .motifc{color:rgba(%(argb)s,.10)}
 .chip{color:%(m)s}
 .hl{color:%(m)s;-webkit-text-fill-color:%(m)s;text-shadow:0 0 12px rgba(%(mrgb)s,.8)}
+.grade{filter:saturate(1.15) contrast(1.1) hue-rotate(-8deg) brightness(.92)}.gradeov{position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg,rgba(168,85,247,.32),rgba(255,62,165,.2));mix-blend-mode:overlay}
 /* 底座 */
 .dk{position:absolute;left:0;right:0;top:1576px;bottom:0;background:linear-gradient(180deg,#0C0814,#050407)}
 .dkg{position:absolute;left:240px;top:1576px;width:600px;height:160px;background:radial-gradient(ellipse at 50%% 0%%,rgba(%(argb)s,.28),transparent 70%%)}

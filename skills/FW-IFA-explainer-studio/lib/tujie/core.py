@@ -45,16 +45,18 @@ class Seg:
         """全片时间 → 本段局部时间。"""
         return round(float(t) - self.start, 3)
 
-    def times(self, items, key="t", first=0.4, last_pad=0.6):
+    def times(self, items, key="t", first=0.4, last_pad=0.6, gap=0.6):
         """列表项的出现时间（局部秒）。没写 t 的按段长均分。"""
         n = len(items)
         out = []
         for k, it in enumerate(items):
-            if isinstance(it, dict) and it.get(key) is not None:
+            if isinstance(it, dict) and isinstance(it.get(key), (int, float)):
                 out.append(self.L(it[key]))
             else:
                 span = max(0.1, self.d - first - last_pad)
                 out.append(round(first + span * k / max(1, n), 3))
+        for k in range(1, n):  # 说得快时顺延：相邻两项至少隔 0.6 秒，免得前一张还没进场就被压暗
+            out[k] = round(min(max(out[k], out[k - 1] + gap), self.d - 0.3), 3)
         return out
 
     def at(self, key, default):
@@ -88,6 +90,45 @@ class Film:
         self.motif = plan.get("motif", [])
         self.cur = None
         os.makedirs(os.path.join(out, "compositions"), exist_ok=True)
+
+    # ------------------------------------------------------------ 说话时间（让动画对齐本人说话）
+    def _speech_index(self):
+        if not hasattr(self, "_ct"):
+            ct = self.plan.get("_chartimes") or []
+            self._ct = ("".join(c[0] for c in ct).lower(), ct)
+        return self._ct
+
+    def speech_find(self, word, t0=0.0, t1=None):
+        """在 t0–t1 之间找这个词第一次被说出来的起止时间（全片秒）。先查字级时间，再按字幕位置估算。找不到返回 None。"""
+        import re as _re
+        t1 = self.dur if t1 is None else t1
+        w = _re.sub(r"[\s，。、！？,.!?：:“”\"'*|]", "", str(word)).lower()
+        if not w:
+            return None
+        text, ct = self._speech_index()
+        i = text.find(w)
+        while i >= 0:
+            s, e = ct[i][1], ct[i + len(w) - 1][2]
+            if t0 - 0.3 <= s <= t1:
+                return s, e
+            i = text.find(w, i + 1)
+        for c in self.plan.get("_captions", []):
+            tx = _re.sub(r"[\s，。、！？,.!?：:“”\"']", "", c["text"]).lower()
+            j = tx.find(w)
+            if j >= 0 and len(tx):
+                s = c["start"] + (c["end"] - c["start"]) * j / len(tx)
+                e = c["start"] + (c["end"] - c["start"]) * (j + len(w)) / len(tx)
+                if t0 - 0.3 <= s <= t1:
+                    return round(s, 3), round(e, 3)
+        return None
+
+    def reveal_per(self, text, seg, default=0.07):
+        """逐字展开的间隔：这句话在原声里说了多久，就用多久展开（每字 0.03–0.12 秒）。找不到就用默认。"""
+        n = len(plain(text).replace("|", "").replace(" ", ""))
+        hit = self.speech_find(plain(text), seg.start, seg.end) if n else None
+        if hit and n:
+            return max(0.03, min(0.12, (hit[1] - hit[0]) / n))
+        return default
 
     def prepare(self, seg):
         """进入一段之前调用：按这一段的段落层参数（energy／enter／card_enter／tone）设置动作和色调。seg=None 时恢复默认。"""

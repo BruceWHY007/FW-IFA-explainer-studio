@@ -216,6 +216,19 @@ def cmd_captions(a):
             if ma is not None and mb is not None and mb - ma > 0.1:
                 caps.append({"text": txt, "start": round(ma, 3), "end": round(mb, 3), "sid": i, "chars": True})
     spans = [x for x in spans if str(x[3]) in fix or not ss[x[3]].get("chars")]
+    # 字级时间（剪辑后时间轴）：build 用它把「说到某个词」换成秒数、让逐字展开跟语速走
+    inside = lambda tt: any(x - 0.02 <= tt <= y + 0.02 for x, y in edl)
+    ct = []
+    for i, s in enumerate(ss):
+        if i in drop or str(i) in drop:
+            continue
+        for c in s.get("chars") or []:
+            if inside(c["s"]) and inside(c["e"]):
+                a_, b_ = m(c["s"], "s"), m(c["e"], "e")
+                if a_ is not None and b_ is not None:
+                    ct.append([c["c"], round(a_, 3), round(b_, 3)])
+    ct.sort(key=lambda x: x[1])
+    json.dump(ct, open(os.path.join(a.work, "chartimes.json"), "w", encoding="utf-8"), ensure_ascii=False)
     for ma, mb, text, i in spans:
         ps = phrases(text, a.maxc)
         tw = [max(0.5, sum(weight(c) for c in p)) for p in ps]
@@ -243,7 +256,7 @@ def cmd_captions(a):
         if 0 < g < 0.35:
             caps[k]["end"] = caps[k + 1]["start"]
     json.dump(caps, open(os.path.join(a.work, "captions.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=0)
-    print(f"captions.json：{len(caps)} 条")
+    print(f"captions.json：{len(caps)} 条；chartimes.json：{len(ct)} 个字的时间（分镜表里可以写 \"t\": \"@关键词\"）")
 
 
 # ---------------------------------------------------------------- B-roll
@@ -315,11 +328,18 @@ def cmd_base(a):
     manifest_add(a.work, "tex_stone", os.path.join(T, "stone.jpg"), "底纹－石墨岩面")
     manifest_add(a.work, "tex_archive", os.path.join(T, "archive.jpg"), "底纹－暖黑纸面")
     n = 0
-    for s in SFX:
+    styles = [a.style] if a.style else ["tanjin", "dangan", "kuangshi", "cilan", "nihong"]
+    for st in styles:  # 各风格自己的音效（程序合成，随技能附带）
+        for kind in ("soft", "snap", "swoosh", "whoosh", "impact", "click"):
+            p = os.path.join(ROOT, "assets", "sfx", st, kind + ".mp3")
+            if os.path.exists(p):
+                manifest_add(a.work, f"sfx_{st}_{kind}", p, f"音效－{st}－{kind}"); n += 1
+    m = 0
+    for s in SFX:  # 可选：通用音效目录（TUJIE_SFX_DIR），风格音效缺项时补位
         p = os.path.join(SFX_DIR, s + ".mp3")
         if os.path.exists(p):
-            manifest_add(a.work, f"sfx_{s}", p, f"音效－{s}"); n += 1
-    print(f"字体 5 个、底纹 2 张、音效 {n}/{len(SFX)} 个（音效目录 {SFX_DIR}；没有就不加音效，可设 TUJIE_SFX_DIR）")
+            manifest_add(a.work, f"sfx_{s}", p, f"音效－{s}"); m += 1
+    print(f"字体 5 个、底纹 2 张、风格音效 {n} 个、通用音效 {m} 个")
 
 
 def main():
@@ -332,7 +352,7 @@ def main():
     p.add_argument("--name"); p.add_argument("--start", type=float, default=0); p.add_argument("--dur", type=float, default=12); p.add_argument("--kinds", default="band,thumb")
     p = sp.add_parser("image"); p.add_argument("--work", required=True); p.add_argument("--src", required=True); p.add_argument("--key", required=True); p.add_argument("--name"); p.add_argument("--kinds", default="bg,thumb")
     p = sp.add_parser("mix"); p.add_argument("--work", required=True); p.add_argument("--music", required=True); p.add_argument("--gain", type=float, default=-6); p.add_argument("--dur", type=float)
-    p = sp.add_parser("base"); p.add_argument("--work", required=True)
+    p = sp.add_parser("base"); p.add_argument("--work", required=True); p.add_argument("--style", help="只加这一套风格的音效（不写就五套都加）")
     a = ap.parse_args()
     globals()["cmd_" + a.cmd](a)
 

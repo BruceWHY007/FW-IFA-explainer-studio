@@ -87,6 +87,7 @@ def main():
     ap.add_argument("--style", choices=STYLES)
     ap.add_argument("--out", default=os.path.join(tempfile.gettempdir(), "ifa-tujie-selftest"))
     ap.add_argument("--snapshot", action="store_true")
+    ap.add_argument("--plan", default="all", help="examples/demo 里的哪份分镜表：demo／variants／all（默认全跑）")
     a = ap.parse_args()
     OUT = os.path.abspath(a.out)
     A = os.path.join(OUT, "assets")
@@ -102,6 +103,13 @@ def main():
               "tex_stone": "assets/tex/stone.jpg", "tex_archive": "assets/tex/archive.jpg"}
     for k in (1, 2, 3):
         assets[f"thumb_demo{k}"] = f"assets/demo/thumb_demo{k}.jpg"
+    sfx_src = os.path.join(ROOT, "assets", "sfx")
+    if os.path.isdir(sfx_src):
+        shutil.copytree(sfx_src, os.path.join(A, "sfx_style"), dirs_exist_ok=True)
+        for st_ in os.listdir(sfx_src):
+            for f in os.listdir(os.path.join(sfx_src, st_)):
+                if f.endswith(".mp3"):
+                    assets[f"sfx_{st_}_{f[:-4]}"] = f"assets/sfx_style/{st_}/{f}"
     from prep import SFX_DIR, SFX
     if os.path.isdir(SFX_DIR):
         os.makedirs(os.path.join(A, "sfx"), exist_ok=True)
@@ -117,32 +125,58 @@ def main():
             shutil.copy(g, os.path.join(A, "gsap.min.js"))
     json.dump(assets, open(os.path.join(OUT, "assets.json"), "w"), indent=1)
     demo = os.path.join(ROOT, "examples", "demo")
-    for f in ("captions_demo.json", "cuts_demo.json"):
-        shutil.copy(os.path.join(demo, f), OUT)
-    plan0 = json.load(open(os.path.join(demo, "plan_demo.json"), encoding="utf-8"))
+    for f in os.listdir(demo):
+        if f.startswith(("captions_", "cuts_")):
+            shutil.copy(os.path.join(demo, f), OUT)
+    srcs = {f[5:-5]: os.path.join(demo, f) for f in os.listdir(demo) if f.startswith("plan_") and f.endswith(".json")}
+    if a.plan in ("all", "draft"):  # 自动出分镜表草稿，再构建一遍
+        dp = os.path.join(OUT, "plan_draft_src.json")
+        r = subprocess.run([sys.executable, os.path.join(HERE, "draft_plan.py"), "--captions", os.path.join(OUT, "captions_demo.json"),
+                            "--style", "tanjin", "--title", "示例｜自动草稿", "--host", "主讲人", "--badge", "主讲人,示例", "--duration", str(DUR),
+                            "--aroll-duration", str(DUR), "--out", dp, "--fill-placeholders", "band=band_demo,thumb=thumb_demo1,tile=band_demo"],
+                           capture_output=True, text=True, encoding="utf-8")
+        if r.returncode == 0:
+            srcs["draft"] = dp
+        else:
+            print("✗ 草稿生成失败：" + (r.stdout + r.stderr)[-500:])
+    names = sorted(srcs) if a.plan == "all" else [a.plan]
     results = []
-    for st in ([a.style] if a.style else STYLES):
-        plan = dict(plan0, style=st, title=f"{plan0['title']}·{st}")
-        pp = os.path.join(OUT, f"plan_{st}.json")
-        json.dump(plan, open(pp, "w", encoding="utf-8"), ensure_ascii=False)
-        d = os.path.join(OUT, st)
-        shutil.rmtree(d, ignore_errors=True)
-        r = subprocess.run([sys.executable, os.path.join(HERE, "build.py"), pp, "--assets", os.path.join(OUT, "assets.json"),
-                            "--geom", os.path.join(OUT, "geom.json"), "--out", d], capture_output=True, text=True, encoding="utf-8")
-        ok_build = r.returncode == 0
-        line = (r.stdout.strip().splitlines() or ["?"])[-1] if ok_build else (r.stdout + r.stderr)[-600:]
-        lint = "跳过（没装 OpenMotion）"
-        if ok_build and have_om:
-            om.link_dir(A, os.path.join(d, "assets"))
-            json.dump({"paths": {"blocks": "compositions", "assets": "assets"}}, open(os.path.join(d, "hyperframes.json"), "w"))
-            lr = subprocess.run([sys.executable, os.path.join(HERE, "om.py"), "lint", "--dir", d], capture_output=True, text=True, encoding="utf-8")
-            lint = (lr.stdout.strip().splitlines() or ["?"])[0]
-            if a.snapshot and lr.returncode == 0:
-                sd = os.path.join(OUT, f"snap_{st}")
-                subprocess.run([sys.executable, os.path.join(HERE, "om.py"), "snapshot", "--dir", d, "--at", "2.5,6.5,12.5,17.5,24,29,33.8,39", "--out", sd],
-                               capture_output=True, text=True)
-                lint += f"；抽帧 → {sd}"
-        results.append((st, ok_build, line, lint))
+    for pn in names:
+        plan0 = json.load(open(srcs[pn], encoding="utf-8"))
+        for st in ([a.style] if a.style else STYLES):
+            plan = dict(plan0, style=st, title=f"{plan0['title']}·{st}")
+            tag = st if pn == "demo" else f"{st}_{pn}"
+            pp = os.path.join(OUT, f"plan_{tag}.json")
+            json.dump(plan, open(pp, "w", encoding="utf-8"), ensure_ascii=False)
+            d = os.path.join(OUT, tag)
+            shutil.rmtree(d, ignore_errors=True)
+            r = subprocess.run([sys.executable, os.path.join(HERE, "build.py"), pp, "--assets", os.path.join(OUT, "assets.json"),
+                                "--geom", os.path.join(OUT, "geom.json"), "--out", d], capture_output=True, text=True, encoding="utf-8")
+            ok_build = r.returncode == 0
+            line = (r.stdout.strip().splitlines() or ["?"])[-1] if ok_build else (r.stdout + r.stderr)[-600:]
+            lint = "跳过（没装 OpenMotion）"
+            if ok_build and have_om:
+                om.link_dir(A, os.path.join(d, "assets"))
+                json.dump({"paths": {"blocks": "compositions", "assets": "assets"}}, open(os.path.join(d, "hyperframes.json"), "w"))
+                lr = subprocess.run([sys.executable, os.path.join(HERE, "om.py"), "lint", "--dir", d], capture_output=True, text=True, encoding="utf-8")
+                lint = (lr.stdout.strip().splitlines() or ["?"])[0]
+                cr = subprocess.run([sys.executable, os.path.join(HERE, "om.py"), "check", "--dir", d], capture_output=True, text=True, encoding="utf-8")
+                lint += "；" + (cr.stdout.strip().splitlines() or ["?"])[0]
+                if cr.returncode:
+                    ok_build = False
+                    lint += "\n" + "\n".join(cr.stdout.strip().splitlines()[1:6])
+                if pn == "demo" and st == (a.style or STYLES[0]):
+                    cv = subprocess.run([sys.executable, os.path.join(HERE, "cover.py"), pp, "--assets", os.path.join(OUT, "assets.json"),
+                                         "--geom", os.path.join(OUT, "geom.json"), "--stage", d, "--video", os.path.join(A, "demo", "aroll.mp4"),
+                                         "--out", os.path.join(OUT, "cover")], capture_output=True, text=True, encoding="utf-8")
+                    lint += "；封面 " + ("✓ " + os.path.join(OUT, "cover") if cv.returncode == 0 else "✗ " + (cv.stdout + cv.stderr)[-300:])
+                if a.snapshot and lr.returncode == 0:
+                    sd = os.path.join(OUT, f"snap_{tag}")
+                    ats = "2.5,6.5,12.5,17.5,24,29,33.8,39" if pn == "demo" else "3.2,8.8,14.5,18.6,25.2,31.0,36.8,41.5"
+                    subprocess.run([sys.executable, os.path.join(HERE, "om.py"), "snapshot", "--dir", d, "--at", ats, "--out", sd],
+                                 capture_output=True, text=True)
+                    lint += f"；抽帧 → {sd}"
+            results.append((tag, ok_build, line, lint))
     print()
     for st, okb, line, lint in results:
         print(f"[{st}] 构建：{'✓' if okb else '✗'} {line}\n         检查：{lint}")

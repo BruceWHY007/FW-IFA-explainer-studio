@@ -4,6 +4,7 @@
 import json, os
 from .core import W, H, HOST_H, CAP_Y, ZOOM, esc, icon, stamp_ids, drift
 
+STYLE_SFX_VOL = {"soft": 0.55, "snap": 0.5, "swoosh": 0.45, "whoosh": 0.45, "impact": 0.5, "click": 0.5}
 SFX_FILES = {
     "soft": ("transition-soft", 0.28), "snap": ("transition-snap", 0.16), "swoosh": ("swoosh-quick", 0.20),
     "whoosh": ("whoosh-fast", 0.18), "impact": ("impact-cine", 0.26), "click": ("click-camera", 0.22),
@@ -22,14 +23,14 @@ def motif_pattern(film, seg, opacity=1.0, size=58, gap=150, rot=-12):
             y = row * gap
             cells.append(f'<div class="ab" style="left:{x:.0f}px;top:{y:.0f}px">{icon(names[k % len(names)], size, "currentColor", 1.6)}</div>')
             k += 1
-    return (f'<div id="{seg.id}-motif" class="ab motifc" style="left:-200px;top:-200px;width:1500px;height:2400px;opacity:{opacity};transform:rotate({rot}deg)">'
+    return (f'<div id="{seg.id}-motif" class="ab motifc" data-layout-ignore style="left:-200px;top:-200px;width:1500px;height:2400px;opacity:{opacity};transform:rotate({rot}deg)">'
             + "".join(cells) + "</div>")
 
 
 def graphic_bg(film, seg, photo=None, dim=None, pattern=None):
     """按风格铺图解段背景。photo 是素材键（图片或视频），pattern=True 时铺母题纹样。"""
     st = film.st.key
-    body = '<div class="bgbase"></div>'
+    body = '<div class="bgbase" data-layout-ignore></div>'
     script = ""
     photo = photo or seg.bg
     if photo:
@@ -38,22 +39,33 @@ def graphic_bg(film, seg, photo=None, dim=None, pattern=None):
                 "cilan": "saturate(.8) brightness(.75)", "nihong": "saturate(1.1) brightness(.6)"}.get(st, "brightness(.7)")
         d0 = {"tanjin": .38, "dangan": .32, "kuangshi": .42, "cilan": .35, "nihong": .4}[st] if dim is None else dim
         if is_video:
-            body += (f'<video id="{seg.id}-bg" class="clip" data-start="0" data-duration="{seg.d:.3f}" src="{film.a(photo)}" muted playsinline '
+            body += (f'<video id="{seg.id}-bg" class="clip" data-layout-ignore data-start="0" data-duration="{seg.d:.3f}" src="{film.a(photo)}" muted playsinline '
                      f'style="position:absolute;left:-60px;top:-60px;width:1200px;height:2040px;object-fit:cover;filter:{filt}"></video>')
         else:
-            body += (f'<div id="{seg.id}-bg" class="ab" style="left:-60px;top:-60px;width:1200px;height:2040px;'
+            body += (f'<div id="{seg.id}-bg" class="ab" data-layout-ignore style="left:-60px;top:-60px;width:1200px;height:2040px;'
                      f'background:url(\'{film.a(photo)}\') center/cover;filter:{filt}"></div>')
-        body += f'<div class="ab" style="inset:0;background:rgba(0,0,0,{d0})"></div>'
+        body += f'<div class="ab" data-layout-ignore style="inset:0;background:rgba(0,0,0,{d0})"></div>'
         script += drift(f"#{seg.id}-bg", seg.d)
     if pattern is None:
         pattern = st in ("cilan", "nihong") and not photo
     if pattern:
         body += motif_pattern(film, seg)
         script += f'tl.fromTo("#{seg.id}-motif",{{y:0}},{{y:-150,duration:{seg.d:.2f},ease:"none"}},0);\n'
-    body += '<div class="vig"></div>'
+    body += '<div class="vig" data-layout-ignore></div>'
     if st in ("tanjin", "dangan"):
-        body += '<div class="grain"></div>'
+        body += '<div class="grain" data-layout-ignore></div>'
     return body, script
+
+
+def grade_cls(film, seg):
+    """实拍按风格调色：同一套风格里，来源不同的免费素材色调统一。plan 或段落 data 里写 grade:false 可以关掉。"""
+    if film.plan.get("grade") is False or (seg and seg.data.get("grade") is False):
+        return ""
+    return " grade"
+
+
+def grade_ov(film, seg):
+    return '<div class="gradeov" data-layout-ignore></div>' if grade_cls(film, seg) else ""
 
 
 def band(film, seg, key, y, h=608, name="band", start=0.0, dur=None, edge=True):
@@ -62,11 +74,12 @@ def band(film, seg, key, y, h=608, name="band", start=0.0, dur=None, edge=True):
     fade = ('<div class="ab" style="inset:0;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,0) 18%,rgba(0,0,0,0) 80%,rgba(0,0,0,.75))"></div>'
             if edge else "")
     src = film.a(key)
-    media = (f'<video id="{seg.id}-{name}" class="clip" data-start="{start:.3f}" data-duration="{dur:.3f}" src="{src}" muted playsinline '
+    g = grade_cls(film, seg)
+    media = (f'<video id="{seg.id}-{name}" class="clip{g}" data-start="{start:.3f}" data-duration="{dur:.3f}" src="{src}" muted playsinline '
              f'style="position:absolute;left:0;top:0;width:1080px;height:{h}px;object-fit:cover"></video>'
              if src.lower().endswith((".mp4", ".mov", ".webm")) else
-             f'<div class="ab" style="inset:0;background:url(\'{src}\') center/cover"></div>')
-    return f'<div id="{seg.id}-{name}w" class="ab" style="left:0;top:{y}px;width:1080px;height:{h}px;overflow:hidden">{media}{fade}</div>'
+             f'<div class="ab{g}" style="inset:0;background:url(\'{src}\') center/cover"></div>') + grade_ov(film, seg)
+    return f'<div id="{seg.id}-{name}w" class="ab" data-layout-allow-overflow style="left:0;top:{y}px;width:1080px;height:{h}px;overflow:hidden">{media}{fade}</div>'
 
 
 # ---------------------------------------------------------------- 底座
@@ -98,7 +111,7 @@ def dock(film):
     items, script = "", ""
     for k, (t0, nm) in enumerate(ch):
         items += (f'<div id="dk-i{k}" class="it" style="left:{k * span:.0f}px;width:{span - 8:.0f}px"><div class="n">{k + 1:02d}</div><div class="l">{esc(nm)}</div>'
-                  f'<div id="dk-on{k}" class="on"><div class="n">{k + 1:02d}</div><div class="l">{esc(nm)}</div></div>'
+                  f'<div id="dk-on{k}" class="on" data-layout-allow-overlap><div class="n">{k + 1:02d}</div><div class="l">{esc(nm)}</div></div>'
                   f'<div class="u"></div><div id="dk-ud{k}" class="ud"></div></div>')
         script += (f'tl.fromTo("#dk-on{k}",{{opacity:0}},{{opacity:1,duration:0.35}},{t0 + 0.05:.2f});\n'
                    f'tl.fromTo("#dk-ud{k}",{{scaleX:0}},{{scaleX:1,duration:0.5,ease:"power3.out"}},{t0 + 0.05:.2f});\n')
@@ -109,7 +122,7 @@ def dock(film):
         stats = "".join(
             f'<div class="st"><div class="sl">{esc(s[0])}</div><div class="sv {s[2] if len(s) > 2 else ""}">{esc(s[1])}</div></div>'
             for s in u.get("stats", [])[:2])
-        ups += (f'<div id="dk-up{i}" class="upd"><div class="lab"><span class="dot"></span>{esc(u.get("label", "最新进展"))}'
+        ups += (f'<div id="dk-up{i}" class="upd" data-layout-allow-overlap><div class="lab"><span class="dot"></span>{esc(u.get("label", "最新进展"))}'
                 f'<small>{esc(u.get("label_en", "LATEST"))}</small></div>'
                 f'<div class="ti">{esc(u["title"])}</div><div class="nt">{esc(u.get("note", ""))}</div><div class="sts">{stats}</div></div>')
         a0, a1 = float(u["start"]), float(u["end"])
@@ -226,10 +239,14 @@ def index(film, hosts_order):
     sfx_dir_keys = {k: f"sfx_{v[0]}" for k, v in SFX_FILES.items()}
     tags = ""
     for k, (t, kind, vol) in enumerate(sorted(film.sfx)):
-        key = sfx_dir_keys.get(kind)
+        skey = f"sfx_{film.st.key}_{kind}"  # 本风格自己的音效（assets/sfx/<风格>/，程序合成）优先
+        if film.has(skey):
+            key, base_v = skey, STYLE_SFX_VOL.get(kind, 0.5)
+        else:
+            key, base_v = sfx_dir_keys.get(kind), SFX_FILES.get(kind, ("", 0.2))[1]
         if not key or not film.has(key) or t < 0 or t > film.dur - 0.3:
             continue
-        v = vol if vol is not None else SFX_FILES[kind][1]
+        v = vol * base_v / SFX_FILES.get(kind, ("", 0.2))[1] if vol is not None else base_v
         tags += (f'<audio id="sfx{k}" class="clip" data-start="{t:.3f}" data-duration="1.8" data-track-index="{30 + k % 4}" '
                  f'data-volume="{v}" src="{film.a(key)}"></audio>\n')
     hosts = ""
@@ -266,7 +283,7 @@ body{{margin:0;background:#000}}
 </style></head>
 <body>
 <div id="main" data-composition-id="main" data-start="0" data-duration="{film.dur}" data-width="1080" data-height="1920" data-fps="30">
-<div id="hostwrap"><div id="hostzoom">
+<div id="hostwrap"><div id="hostzoom" data-layout-allow-overflow>
 <video id="aroll" class="clip" data-start="0" data-duration="{film.aroll_dur}" data-track-index="0" src="{film.a('aroll')}" muted playsinline></video>
 </div><div id="hostscrim"></div></div>
 {voice}

@@ -42,6 +42,49 @@ def texts(v, keys=None):
     return out
 
 
+TIME_KEYS = {"t", "t1", "t2", "tl", "tr", "push", "hi_t", "bars_t", "q_t", "line_t", "t_a", "t_b", "t_end", "t_hi", "all_on", "all_t", "out"}
+
+
+def resolve_times(film):
+    """把分镜表里写成「@关键词」「@关键词+0.3」的时间，换成这个词被说出来的秒数（在本段时间里找）。"""
+    import re
+    errs = []
+
+    def conv(v, t0, t1, where):
+        m = re.match(r"^@(.+?)([+-]\d+(?:\.\d+)?)?$", v.strip())
+        if not m:
+            errs.append(f"{where}：时间「{v}」写法不对，应该是 @关键词 或 @关键词+0.3")
+            return t0
+        hit = film.speech_find(m.group(1), t0, t1)
+        if not hit:
+            errs.append(f"{where}：在 {t0:.1f}–{t1:.1f} 秒的原声里找不到「{m.group(1)}」（换一个本人原话里的词，或直接写秒数）")
+            return t0
+        return round(hit[0] + float(m.group(2) or 0), 3)
+
+    def walk(obj, t0, t1, where):
+        if isinstance(obj, dict):
+            for k, v in list(obj.items()):
+                if isinstance(v, str) and v.startswith("@") and k in TIME_KEYS:
+                    obj[k] = conv(v, t0, t1, f"{where}.{k}")
+                elif k == "tiles_t" and isinstance(v, list):
+                    obj[k] = [conv(x, t0, t1, f"{where}.tiles_t") if isinstance(x, str) and x.startswith("@") else x for x in v]
+                else:
+                    walk(v, t0, t1, where)
+        elif isinstance(obj, list):
+            for x in obj:
+                walk(x, t0, t1, where)
+    for s in film.segs:
+        walk(s.data, s.start, s.end, s.id)
+    for u in film.plan.get("updates", []):
+        for k in ("start", "end"):
+            if isinstance(u.get(k), str):
+                u[k] = conv(u[k], 0, film.dur, f"updates.{k}")
+    for ch in film.plan.get("chapters", []):
+        if isinstance(ch[0], str):
+            ch[0] = conv(ch[0], 0, film.dur, "chapters")
+    return errs
+
+
 def auto_params(seg, state):
     """分镜表没写段落层参数时，按这一段的文字自动推断，让同风格的片子各段表现不一样。写了的参数优先。
     克制：只动图解段；「有力＋放大冲击」全片最多 2 次、不相邻，否则会变成新的千篇一律。"""
@@ -135,11 +178,12 @@ def main():
     rel = lambda p: p if os.path.isabs(p) else os.path.join(pdir, p)
     plan["_captions"] = json.load(open(rel(plan["captions"]), encoding="utf-8")) if plan.get("captions") else []
     plan["_cuts"] = json.load(open(rel(plan["cuts"]), encoding="utf-8")) if plan.get("cuts") else []
+    plan["_chartimes"] = json.load(open(rel(plan["chartimes"]), encoding="utf-8")) if plan.get("chartimes") and os.path.exists(rel(plan["chartimes"])) else []
     assets = json.load(open(a.assets, encoding="utf-8"))
     geom = json.load(open(a.geom, encoding="utf-8"))
     film = Film(plan, assets, geom, a.out)
     film.st.bind(film)
-    errors = []
+    errors = resolve_times(film)
     auto_log = {}
     explicit = sum(1 for s in film.segs if s.kind == "graphic" and (any(k in s.data for k in PARA_KEYS) or "*" in json.dumps(s.data, ensure_ascii=False)))
     if not plan.get("no_auto"):

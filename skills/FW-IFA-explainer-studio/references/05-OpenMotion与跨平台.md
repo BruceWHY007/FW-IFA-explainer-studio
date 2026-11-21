@@ -19,6 +19,7 @@
 | `om.py stage --work W --dir out` | 把工程素材目录链到 `out/assets`，本地 lint、抽帧用 |
 | `om.py lint --dir out` | OpenMotion 自带检查，必须 0 错误 |
 | `om.py snapshot --dir out --at 2.6,6.6,… --out 帧目录` | 按时间抽帧，生成 PNG 和总览图 |
+| `om.py check --dir out` | 全画面版面检查（渲染器自带的 inspect）：每段入场后和段尾各取一帧，查文字互相压住（包括字幕压到卡片）、超出画面、溢出容器；装饰层和设计上的叠放已在生成时标注，不算问题 |
 | `om.py preview --work W --open` | 打开 Studio 编辑器 |
 | `om.py export --work W --out 成片.mp4` | 导出、等技术校验、复制成片（63 秒样片约 80 秒） |
 

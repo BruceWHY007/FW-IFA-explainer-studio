@@ -8,6 +8,7 @@
   python om.py stage   --work W --dir OUT                把工程素材链到 OUT/assets，供本地 lint／snapshot
   python om.py lint    --dir OUT
   python om.py snapshot --dir OUT --at 1.2,5.8,… --out 帧目录
+  python om.py check   --dir OUT                       全画面版面检查：文字互相压住、超出画面、溢出容器（每段入场后和段尾各查一帧）
   python om.py preview --work W                          打开 Studio 编辑器，打印网址
   python om.py export  --work W --out 成片.mp4            导出并等技术校验，复制成片
 
@@ -239,6 +240,35 @@ def cmd_lint(a):
     sys.exit(0 if d.get("ok") else 1)
 
 
+def cmd_check(a):
+    """全画面版面检查：用渲染器自带的版面检查，在每段入场后和段尾各取一帧，查文字互相压住、超出画面、溢出容器。
+    装饰层和设计上的叠放（进度条亮暗两层、金句前后两句）已在生成时标注，不算问题。"""
+    rep = os.path.join(a.dir, "build_report.json")
+    segs = json.load(open(rep, encoding="utf-8"))["segments"] if os.path.exists(rep) else []
+    times = set()
+    for sid, kind, lay, s0, s1 in segs:
+        d = s1 - s0
+        times.add(round(s0 + min(1.3, d * 0.45), 2))
+        times.add(round(s1 - 0.35, 2))
+    if a.at:
+        times |= {float(x) for x in a.at.split(",")}
+    at = ",".join(f"{t:g}" for t in sorted(times)) or "1"
+    r = subprocess.run([node(), hf_cli(), "inspect", os.path.abspath(a.dir), "--json", "--at", at, "--max-issues", "400", "--timeout", "15000"],
+                       cwd=a.dir, capture_output=True, text=True, encoding="utf-8", env=tool_env())
+    try:
+        d = json.loads(r.stdout[r.stdout.index("{"):r.stdout.rindex("}") + 1])
+    except Exception:
+        sys.exit("版面检查没跑起来：" + (r.stdout + r.stderr)[-1200:])
+    seg_at = lambda t: next((s[0] for s in segs if s[3] - 0.01 <= t < s[4]), "?")
+    real = [x for x in d.get("issues", []) if x["code"] in ("content_overlap", "canvas_overflow", "text_box_overflow") and x["severity"] != "info"]
+    names = {"content_overlap": "文字互相压住", "canvas_overflow": "超出画面", "text_box_overflow": "文字溢出容器"}
+    print(f"{'✓ 版面检查通过' if not real else '✗ 版面有问题'}：抽查 {len(times)} 个时间点，{len(real)} 处问题")
+    for x in real:
+        print(f"  {x.get('time', 0):6.2f}s [{seg_at(x.get('time', 0))}] {names[x['code']]}：{x.get('selector', '')} "
+              f"{('↔ ' + x['containerSelector']) if x.get('containerSelector') else ''} 「{(x.get('text') or '')[:20]}」")
+    sys.exit(1 if real else 0)
+
+
 def cmd_snapshot(a):
     os.makedirs(a.out, exist_ok=True)
     r = subprocess.run([node(), hf_cli(), "snapshot", os.path.abspath(a.dir), "--at", a.at, "--no-end", "-o", os.path.abspath(a.out), "--timeout", "120000"],
@@ -291,6 +321,7 @@ def main():
     p = sp.add_parser("stage"); p.add_argument("--work", required=True); p.add_argument("--dir", required=True)
     p = sp.add_parser("lint"); p.add_argument("--dir", required=True)
     p = sp.add_parser("snapshot"); p.add_argument("--dir", required=True); p.add_argument("--at", required=True); p.add_argument("--out", required=True)
+    p = sp.add_parser("check"); p.add_argument("--dir", required=True); p.add_argument("--at", help="另外加查的时间点，逗号分隔")
     p = sp.add_parser("preview"); p.add_argument("--work", required=True); p.add_argument("--open", action="store_true")
     p = sp.add_parser("export"); p.add_argument("--work", required=True); p.add_argument("--out", required=True); p.add_argument("--timeout", type=int, default=3600)
     a = ap.parse_args()
