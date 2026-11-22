@@ -237,7 +237,7 @@ def main():
             order.append((s.id, s.start, s.end, 6 + k % 3, 4, "graphics"))
     order.append(("captions", 0, film.dur, 9, 6, "captions"))
     frame.index(film, order)
-    warns = variety(film)
+    warns = variety(film) + film.warnings
     ng = sum(1 for s in film.segs if s.kind == "graphic")
     if ng and explicit < ng / 2:
         warns.append(f"只有 {explicit}/{ng} 个图解段在分镜表里按内容设了段落层参数（tone／energy／enter／card_enter／reveal／*重点词*），"

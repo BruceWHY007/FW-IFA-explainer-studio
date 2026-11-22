@@ -320,6 +320,136 @@ def cmd_check(a):
     sys.exit(1 if must else 0)
 
 
+# ---------------------------------------------------------------- 安全区
+# 1080×1920 画布上平台界面的遮挡和裁切（视频号实测＋通用 9:16 安全区示意图，见 references/04-人脸安全.md「平台安全区」）
+SAFE = {"l": 60, "r": 1020, "top": 270, "bottom": 1483, "text": 72}
+SAFE_BG = ["#hostwrap", "#hostscrim", ".bgbase", ".vig", ".grain", ".gradeov", ".motifc", "[data-layout-allow-overflow]", "[data-safe-bleed]",
+           "[data-layout-ignore]", '[id$="-shade"]', ".streak", "video:not(.pipc video)"]  # 背景：允许出界（含装饰用的滚动条、光带）
+SAFE_DOCK = [".dk", ".dkg", ".rule", ".chap", ".upd", ".badge"]  # 底座：不查底部线（左右单独按代码排）
+CSS_EL = ("#main{background:#808080!important}#root{background:transparent!important}"
+          + ",".join(f"{x},{x} *" for x in SAFE_BG + SAFE_DOCK) + "{visibility:hidden!important}"  # 子元素一起藏：播放器会给素材写行内 visibility
+          '[style*="inset:0"]{background:transparent!important;background-image:none!important;box-shadow:none!important;border-color:transparent!important}')  # 整屏底色层：只去掉它自己的底色
+CSS_TX = ("#main{background:#000!important}#root{background:transparent!important}"
+          "*{background:transparent!important;background-image:none!important;border-color:transparent!important;box-shadow:none!important;"
+          "filter:none!important;color:#fff!important;-webkit-text-fill-color:#fff!important;text-shadow:none!important;-webkit-text-stroke:0!important}"
+          "*::before,*::after{background:transparent!important;background-image:none!important;border-color:transparent!important;box-shadow:none!important}"
+          "img,video,svg,canvas,.pipc{visibility:hidden!important}"
+          + ",".join(f"{x},{x} *" for x in SAFE_DOCK + ["[data-safe-bleed]"]) + "{visibility:hidden!important}")
+
+
+def safe_variant(src, dst, css):
+    """复制一份工程，每个 html 的样式末尾加一段 css（藏背景／只留文字），素材链回原工程。"""
+    shutil.rmtree(dst, ignore_errors=True)
+    os.makedirs(os.path.join(dst, "compositions"))
+    for f in ("index.html", "hyperframes.json"):
+        if os.path.exists(os.path.join(src, f)):
+            shutil.copy(os.path.join(src, f), os.path.join(dst, f))
+    for f in os.listdir(os.path.join(src, "compositions")):
+        shutil.copy(os.path.join(src, "compositions", f), os.path.join(dst, "compositions", f))
+    link_dir(os.path.realpath(os.path.join(src, "assets")), os.path.join(dst, "assets"))
+    for f in ["index.html"] + ["compositions/" + x for x in os.listdir(os.path.join(dst, "compositions")) if x.endswith(".html")]:
+        q = os.path.join(dst, f)
+        t = open(q, encoding="utf-8").read()
+        open(q, "w", encoding="utf-8").write(t.replace("</style>", css + "</style>", 1))
+
+
+def cmd_safe(a):
+    """平台安全区检查：除背景以外，字、脸、小窗、卡片、标签都要在安全区里。
+    渲染两遍：一遍藏掉背景（实拍、底纹、全宽横条、人物画面、底座）、铺灰底，看元素有没有越线；
+    一遍去掉所有底色和图片、文字刷白，看文字离左右边够不够远。
+    必须改：元素进了左右 60 像素（视频号会裁掉：iPhone 每边约 49，主流安卓约 60）、顶部 270（状态栏和返回键）、
+            底部 1483 以下（账号名、标题文案；底座不算）。要看：文字离左右边不到 72。"""
+    from PIL import Image, ImageChops, ImageDraw
+    d = os.path.abspath(a.dir)
+    rep = os.path.join(d, "build_report.json")
+    segs = json.load(open(rep, encoding="utf-8"))["segments"] if os.path.exists(rep) else []
+    times = set()
+    for sid, kind, lay, s0, s1 in segs:
+        dd = s1 - s0
+        times |= {round(s0 + min(1.3, dd * 0.45), 2), round((s0 + s1) / 2, 2), round(s1 - 0.35, 2)}
+    if a.at:
+        times |= {float(x) for x in a.at.split(",")}
+    times = sorted(t for t in times if t >= 0)
+    if not os.path.exists(os.path.join(d, "assets")):
+        sys.exit("✗ out/assets 不存在：先跑 om.py stage")
+    work = os.path.join(d, ".safe")
+    jobs = []
+    for mode, css in (("el", CSS_EL), ("tx", CSS_TX)):
+        vd = os.path.join(work, mode)
+        safe_variant(d, vd, css)
+        fd = os.path.join(work, mode + "_frames")
+        shutil.rmtree(fd, ignore_errors=True)
+        jobs.append((mode, fd, subprocess.Popen([node(), hf_cli(), "snapshot", vd, "--at", ",".join(f"{t:g}" for t in times), "--no-end",
+                                                 "-o", fd, "--timeout", "120000"], cwd=vd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=tool_env())))
+    frames = {}
+    for mode, fd, pr in jobs:
+        out, err = pr.communicate()
+        if pr.returncode:
+            sys.exit(f"✗ 安全区抽帧失败（{mode}）：{err.decode('utf-8', 'ignore')[-600:]}")
+        fs = sorted(f for f in os.listdir(fd) if f.startswith("frame-") and f.endswith(".png"))
+        frames[mode] = [os.path.join(fd, f) for f in fs]
+    seg_of = lambda t: next((sid for sid, kind, lay, s0, s1 in segs if s0 <= t < s1), "")
+
+    def hits(img, bg, box, thr):
+        reg = img.crop(box)
+        m = ImageChops.difference(reg, Image.new("RGB", reg.size, bg)).convert("L").point(lambda v: 255 if v > thr else 0)
+        bb = m.getbbox()
+        n = m.histogram()[255]
+        return (n, (bb[0] + box[0], bb[1] + box[1], bb[2] + box[0], bb[3] + box[1])) if bb and n > 40 else (0, None)
+    raw, look, shots = [], [], []  # raw: (时间, 段, 区, 说明)
+    rd = os.path.join(work, "report")
+    shutil.rmtree(rd, ignore_errors=True)
+    os.makedirs(rd)
+    for t, fe, ft in zip(times, frames["el"], frames["tx"]):
+        el = Image.open(fe).convert("RGB")
+        tx = Image.open(ft).convert("RGB")
+        W_, H_ = el.size
+        zones = {"左边": (0, 0, SAFE["l"] - 3, H_), "右边": (SAFE["r"] + 3, 0, W_, H_),
+                 "顶部": (0, 0, W_, SAFE["top"] - 3), "底部": (0, SAFE["bottom"] + 3, W_, H_)}
+        bad = []
+        for name, box in zones.items():
+            n, bb = hits(el, (128, 128, 128), box, 40)
+            if bb:
+                bad.append((name, bb))
+                raw.append((t, seg_of(t), name, f"{t:7.2f}s [{seg_of(t)}] {name}越过安全线：x {bb[0]}–{bb[2]}、y {bb[1]}–{bb[3]}"))
+        for name, box in zones.items():  # 文字越线同样必须改（元素那遍里文字可能在被藏掉的容器里）
+            n, bb = hits(tx, (0, 0, 0), box, 90)
+            if bb and not any(b[0] == name for b in bad):
+                bad.append((name, bb))
+                raw.append((t, seg_of(t), name, f"{t:7.2f}s [{seg_of(t)}] {name}文字越过安全线：x {bb[0]}–{bb[2]}、y {bb[1]}–{bb[3]}"))
+        for name, box in (("左边", (0, 0, SAFE["text"] - 2, H_)), ("右边", (W_ - SAFE["text"] + 2, 0, W_, H_))):
+            n, bb = hits(tx, (0, 0, 0), box, 90)
+            if bb and not any(b[0].startswith(name) for b in bad):
+                bad.append((name + "文字", bb))
+                look.append(f"{t:7.2f}s [{seg_of(t)}] 文字离{name}不到 {SAFE['text']} 像素：x {bb[0]}–{bb[2]}、y {bb[1]}–{bb[3]}")
+        if bad:
+            dr = ImageDraw.Draw(el)
+            for x in (SAFE["l"], SAFE["r"]):
+                dr.line([(x, 0), (x, H_)], fill=(255, 40, 40), width=3)
+            for y in (SAFE["top"], SAFE["bottom"]):
+                dr.line([(0, y), (W_, y)], fill=(255, 40, 40), width=3)
+            for name, bb in bad:
+                dr.rectangle(bb, outline=(255, 220, 0), width=5)
+            pth = os.path.join(rd, f"{t:07.2f}s-{seg_of(t)}.png")
+            el.resize((W_ // 2, H_ // 2)).save(pth)
+            shots.append(pth)
+    # 段尾（停稳以后）还越线的才算必须改；只在中途越线的多半是入场、出场动画，列「要看」
+    last = {sid: round(s1 - 0.35, 2) for sid, kind, lay, s0, s1 in segs}
+    at_end = {(sid, z) for t, sid, z, msg in raw if abs(t - last.get(sid, -1)) < 0.01}
+    must = [msg for t, sid, z, msg in raw if (sid, z) in at_end or sid not in last]
+    look = [msg + "（只在动画途中，段尾停稳后在线内）" for t, sid, z, msg in raw if not ((sid, z) in at_end or sid not in last)] + look
+    print(f"{'✓ 安全区通过' if not must else '✗ 有元素越过安全线'}：抽查 {len(times)} 个时间点，必须改 {len(must)} 处，要看 {len(look)} 处")
+    for x in must:
+        print("  " + x)
+    if look:
+        print("要看（逐条判断）：")
+        for x in look:
+            print("  " + x)
+    if shots:
+        print(f"标出位置的图（灰底上只剩元素，黄框是越线的地方）：{rd}")
+    sys.exit(1 if must else 0)
+
+
 def cmd_snapshot(a):
     os.makedirs(a.out, exist_ok=True)
     r = subprocess.run([node(), hf_cli(), "snapshot", os.path.abspath(a.dir), "--at", a.at, "--no-end", "-o", os.path.abspath(a.out), "--timeout", "120000"],
@@ -373,6 +503,7 @@ def main():
     p = sp.add_parser("lint"); p.add_argument("--dir", required=True)
     p = sp.add_parser("snapshot"); p.add_argument("--dir", required=True); p.add_argument("--at", required=True); p.add_argument("--out", required=True)
     p = sp.add_parser("check"); p.add_argument("--dir", required=True); p.add_argument("--at", help="另外加查的时间点，逗号分隔")
+    p = sp.add_parser("safe"); p.add_argument("--dir", required=True); p.add_argument("--at", help="另外加查的时间点，逗号分隔")
     p = sp.add_parser("preview"); p.add_argument("--work", required=True); p.add_argument("--open", action="store_true")
     p = sp.add_parser("export"); p.add_argument("--work", required=True); p.add_argument("--out", required=True); p.add_argument("--timeout", type=int, default=3600)
     a = ap.parse_args()

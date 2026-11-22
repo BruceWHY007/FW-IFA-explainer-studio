@@ -450,8 +450,8 @@ class Nihong(Style):
 .rule{position:absolute;left:0;right:0;top:1574px;height:2px;background:linear-gradient(90deg,transparent,%(a)s 20%%,%(m)s 50%%,%(a)s 80%%,transparent);box-shadow:0 0 12px %(a)s}
 .badge{position:absolute;left:50%%;top:1548px;transform:translateX(-50%%);height:54px;padding:0 30px;border-radius:10px;text-align:center;background:#0B0712;border:2px solid %(a)s;box-shadow:0 0 18px rgba(%(argb)s,.7),inset 0 0 12px rgba(%(argb)s,.3);font:400 36px/50px SM;color:#F7EEFF;white-space:nowrap;text-shadow:0 0 10px %(a)s}
 .badge b{color:%(m)s;font-weight:400}
-.chap .n{font:400 26px/1 SM;color:rgba(%(argb)s,.6);letter-spacing:2px}
-.chap .l{font:400 40px/1 SM;color:rgba(255,255,255,.32);margin-top:8px}
+.chap .n{font:400 26px/1 SM;color:rgba(%(argb)s,.8);letter-spacing:2px}
+.chap .l{font:400 40px/1 SM;color:rgba(255,255,255,.42);margin-top:8px}
 .chap .on .n{color:%(m)s}.chap .on .l{color:#FFFFFF;text-shadow:0 0 12px rgba(%(argb)s,.8)}
 .chap .u{background:rgba(255,255,255,.08)}
 .chap .ud{background:linear-gradient(90deg,%(a)s,%(m)s);box-shadow:0 0 16px rgba(%(mrgb)s,.9)}

@@ -2,7 +2,7 @@
 """全片骨架：图解段背景、母题纹样、底座（章节进度条＋补充信息卡＋署名牌）、字幕层、音效、index.html。
 五套风格共用这一份结构，只换 CSS。"""
 import json, os
-from .core import W, H, HOST_H, CAP_Y, ZOOM, esc, fit_fs, icon, stamp_ids, drift
+from .core import W, H, HOST_H, CAP_Y, ZOOM, esc, fit_fs, icon, stamp_ids, drift, BG_END, BLEED_W, BLEED_X, SAFE_TEXT, stage_x, stage_y, STAGE_K
 
 STYLE_SFX_VOL = {"soft": 0.55, "snap": 0.5, "swoosh": 0.45, "whoosh": 0.45, "impact": 0.5, "click": 0.5}
 SFX_FILES = {
@@ -54,7 +54,7 @@ def graphic_bg(film, seg, photo=None, dim=None, pattern=None):
     body += '<div class="vig" data-layout-ignore></div>'
     if st in ("tanjin", "dangan"):
         body += '<div class="grain" data-layout-ignore></div>'
-    return body, script
+    return body + BG_END, script  # 标记之后的元素放进缩放层，落进平台安全区（core.Film.scene）
 
 
 def grade_cls(film, seg):
@@ -76,10 +76,11 @@ def band(film, seg, key, y, h=608, name="band", start=0.0, dur=None, edge=True):
     src = film.a(key)
     g = grade_cls(film, seg)
     media = (f'<video id="{seg.id}-{name}" class="clip{g}" data-start="{start:.3f}" data-duration="{dur:.3f}" src="{src}" muted playsinline '
-             f'style="position:absolute;left:0;top:0;width:1080px;height:{h}px;object-fit:cover"></video>'
+             f'style="position:absolute;left:0;top:0;width:{BLEED_W:.0f}px;height:{h}px;object-fit:cover"></video>'
              if src.lower().endswith((".mp4", ".mov", ".webm")) else
              f'<div class="ab{g}" style="inset:0;background:url(\'{src}\') center/cover"></div>') + grade_ov(film, seg)
-    return f'<div id="{seg.id}-{name}w" class="ab" data-layout-allow-overflow style="left:0;top:{y}px;width:1080px;height:{h}px;overflow:hidden">{media}{fade}</div>'
+    # 横条在缩放层里：加宽到 BLEED_W，缩完仍铺满全宽
+    return f'<div id="{seg.id}-{name}w" class="ab" data-layout-allow-overflow style="left:{BLEED_X:.0f}px;top:{y}px;width:{BLEED_W:.0f}px;height:{h}px;overflow:hidden">{media}{fade}</div>'
 
 
 # ---------------------------------------------------------------- 底座
@@ -89,13 +90,13 @@ DOCK_LAYOUT_CSS = """
 .chap .on{position:absolute;left:0;top:0;width:100%;opacity:0}
 .chap .u,.chap .ud{position:absolute;left:30px;right:30px;top:86px;height:3px;border-radius:2px}
 .chap .ud{transform-origin:0 50%;transform:scaleX(0)}
-.upd{position:absolute;left:36px;right:36px;top:1626px;height:176px;opacity:0}
-.upd .lab{position:absolute;left:30px;top:26px;display:flex;align-items:center;gap:12px;font:400 30px/1 SM}
+.upd{position:absolute;left:64px;right:64px;top:1598px;height:166px;opacity:0}
+.upd .lab{position:absolute;left:28px;top:22px;display:flex;align-items:center;gap:12px;font:400 30px/1 SM}
 .upd .dot{width:14px;height:14px;border-radius:50%}
 .upd .lab small{font:600 17px/1 EN,Inter,sans-serif;letter-spacing:4px;opacity:.75}
-.upd .ti{position:absolute;left:30px;top:74px;font-size:44px;line-height:1.1;white-space:nowrap}
-.upd .nt{position:absolute;left:30px;top:134px;font:600 17px/1 EN,Inter,sans-serif;letter-spacing:2px;color:rgba(255,255,255,.42)}
-.upd .sts{position:absolute;right:28px;top:30px;display:flex;gap:14px}
+.upd .ti{position:absolute;left:28px;top:66px;font-size:44px;line-height:1.1;white-space:nowrap}
+.upd .nt{position:absolute;left:28px;top:124px;font:600 17px/1 EN,Inter,sans-serif;letter-spacing:2px;color:rgba(255,255,255,.42)}
+.upd .sts{position:absolute;right:24px;top:24px;display:flex;gap:14px}
 .upd .st{width:136px;height:116px;border-radius:12px;text-align:center;padding-top:18px}
 .upd .sl{font:400 20px/1 SM;color:rgba(255,255,255,.55)}
 .upd .sv{font-size:44px;line-height:1;margin-top:14px}
@@ -125,7 +126,7 @@ def dock(film):
             for s in u.get("stats", [])[:2])
         ups += (f'<div id="dk-up{i}" class="upd" data-layout-allow-overlap><div class="lab"><span class="dot"></span>{esc(u.get("label", "最新进展"))}'
                 f'<small>{esc(u.get("label_en", "LATEST"))}</small></div>'
-                f'<div class="ti" style="font-size:{min(44, fit_fs(u["title"], 950 - 150 * len(u.get("stats", [])[:2]) - (20 if u.get("stats") else 0), 44))}px">{esc(u["title"])}</div><div class="nt">{esc(u.get("note", ""))}</div><div class="sts">{stats}</div></div>')
+                f'<div class="ti" style="font-size:{min(44, fit_fs(u["title"], 900 - 150 * len(u.get("stats", [])[:2]) - (20 if u.get("stats") else 0), 44))}px">{esc(u["title"])}</div><div class="nt">{esc(u.get("note", ""))}</div><div class="sts">{stats}</div></div>')
         a0, a1 = float(u["start"]), float(u["end"])
         script += (f'tl.to("#dk-chap",{{opacity:0,duration:0.25}},{a0:.2f});\n'
                    f'tl.fromTo("#dk-up{i}",{{opacity:0,y:40}},{{opacity:1,y:0,duration:0.4,ease:"back.out(1.5)"}},{a0:.2f});\n'
@@ -152,24 +153,26 @@ def place_caption(seg, text, y):
     """字幕和小窗相撞时让开：小窗在左（右）就挪到右（左）边剩下的空间居中；小窗居中就放到小窗上方。"""
     from .core import tw
     pr = getattr(seg, "pip_rect", None) if seg else None
-    w = min(980, tw(text) * 61 + 24)
+    if pr and getattr(seg, "staged", False):  # 小窗在缩放层里：换成画布坐标
+        pr = (stage_x(pr[0]), stage_y(pr[1]), pr[2] * STAGE_K, pr[3] * STAGE_K)
+    w = min(W - 2 * SAFE_TEXT, tw(text) * 61 + 24)
     if not pr:
         return f"top:{y}px"
     px, py, pw, ph = pr
     if not (y < py + ph and y + 76 > py and 540 - w / 2 < px + pw and 540 + w / 2 > px):
         return f"top:{y}px"
     if px + pw < 430:
-        avail = W - 50 - (px + pw + 16)
+        avail = W - SAFE_TEXT - (px + pw + 16)
         if avail >= w * 0.74:
             fs = min(60, int(60 * avail / w))
-            return f"top:{y}px;left:{px + pw + 16:.0f}px;right:50px;font-size:{fs}px"
+            return f"top:{y}px;left:{px + pw + 16:.0f}px;right:{SAFE_TEXT}px;font-size:{fs}px"
     if px > 650:
-        avail = px - 16 - 50
+        avail = px - 16 - SAFE_TEXT
         if avail >= w * 0.74:
             fs = min(60, int(60 * avail / w))
-            return f"top:{y}px;left:50px;right:{W - px + 16:.0f}px;font-size:{fs}px"
+            return f"top:{y}px;left:{SAFE_TEXT}px;right:{W - px + 16:.0f}px;font-size:{fs}px"
     ny = py - 88
-    if ny < 260:
+    if ny < 300:
         ny = py + ph + 14
     return f"top:{ny:.0f}px"
 
@@ -209,6 +212,8 @@ def captions(film):
     slots = []
     for s in film.segs:
         y = getattr(s, "cap_y_set", None) or s.cap_y or CAP_Y
+        if getattr(s, "staged", False) and getattr(s, "cap_y_set", None):  # 图解段版式按缩放前的坐标给字幕位置
+            y = round(stage_y(y))
         slots.append((s.start, s.end, y, s))
     groups, cs = "", ""
     for k, c in enumerate(caps):
@@ -230,7 +235,7 @@ def captions(film):
         cs += (f'tl.fromTo("#{gid}",{{opacity:0,y:8}},{{opacity:1,y:0,duration:0.12,ease:"power2.out"}},{s0:.3f});\n'
                f'tl.to("#{gid}",{{opacity:0,duration:0.08}},{max(s0 + 0.15, s1 - 0.08):.3f});\n'
                f'tl.set("#{gid}",{{visibility:"hidden"}},{s1:.3f});\n')
-    css = ".cap{position:absolute;left:50px;right:50px;text-align:center;font:400 60px/1.2 SM;color:#fff;letter-spacing:1px;opacity:0}"
+    css = f".cap{{position:absolute;left:{SAFE_TEXT}px;right:{SAFE_TEXT}px;text-align:center;font:400 60px/1.2 SM;color:#fff;letter-spacing:1px;opacity:0}}"
     film.scene("captions", groups, cs, css)
 
 

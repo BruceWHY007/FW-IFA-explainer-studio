@@ -9,7 +9,7 @@
   python3 scripts/recut.py --work 工作目录 --where 107.5    成片第 107.5 秒是原片第几秒、在说哪句（用户指出还有重说时用）
 人听出来、自动没找到的重说：查到原片区间后写进 fix.json 的 "cut": [[原片起, 原片止]]，再跑 recut.py（重跑也保留，不要手改 edl.json）。
 顺序：edl.py → prep.py cut → voice → captions → mix（做过配乐才跑）→ measure.py → 搬分镜表时间 → om.py import
-      → build.py → om.py stage → lint → check → edl.py --scan 查剪好的人声里还有没有重说。
+      → build.py → om.py stage → lint → check → safe（平台安全区）→ edl.py --scan 查剪好的人声里还有没有重说。
       哪一步失败就停在哪一步，前面的产物留着。跑完以后自己抽帧看接点，再 om.py save、export。
 搬分镜表时间：plan.json 里写成数字的时间（段起止、章节、各版式的 t／t1…、底座卡起止、caption_skip）都是旧成片时间。
   旧剪辑表把它换回原片时间，新剪辑表再换成新成片时间；落进新剪掉那段的，贴到下一段保留段的开头。
@@ -210,6 +210,7 @@ def main():
     run("挂素材 om.py stage", [S("om.py"), "stage", "--work", W, "--dir", os.path.abspath(a.out)])
     run("代码检查 om.py lint", [S("om.py"), "lint", "--dir", os.path.abspath(a.out)])
     run("完整检查 om.py check", [S("om.py"), "check", "--dir", os.path.abspath(a.out)])
+    run("平台安全区 om.py safe", [S("om.py"), "safe", "--dir", os.path.abspath(a.out)])
     run("查剩下的重说 edl.py --scan", [S("edl.py"), "--scan", os.path.join(W, "om_assets", "voice.wav")])
     print(f"\n✓ 重剪完成，共 {time.time() - t_all:.0f} 秒。下一步：抽帧看接点（joins.json 里 kind=retake 的时间），"
           f"再 om.py save、om.py export。")

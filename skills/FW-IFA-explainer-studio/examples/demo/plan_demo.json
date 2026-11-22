@@ -6,12 +6,6 @@
  "aroll_duration": 40,
  "captions": "captions_demo.json",
  "cuts": "cuts_demo.json",
- "caption_skip": [
-  [
-   0,
-   4
-  ]
- ],
  "host": {
   "name": "主讲人",
   "badge": [
@@ -84,11 +78,6 @@
        ]
       ],
       "t": 0.1
-     },
-     {
-      "text": "示例 · 图解口播自检",
-      "cls": "sub",
-      "t": 1.6
      }
     ],
     "out": 3.8

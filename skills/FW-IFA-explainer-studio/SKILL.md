@@ -39,7 +39,7 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 
 **第三步：请用户发一段口播视频试做。** 安装和自检通过后，Agent 主动对用户说：
 
-> 环境装好了。发一段 30–60 秒的口播视频给我试试：手机竖拍、对着镜头说一段话就行，最好头顶留一点空。再告诉我内容讲什么、想要哪种感觉（讲钱、讲机构、讲资源、讲品牌、讲科技），我按这个技能做一支样片，顺便帮你选风格。
+> 环境装好了。发一段 30–60 秒的口播视频给我试试：手机竖拍、对着镜头说一段话就行，头顶到画面顶边最好留出画面高度的四分之一（放头顶标题用）。再告诉我内容讲什么、想要哪种感觉（讲钱、讲机构、讲资源、讲品牌、讲科技），我按这个技能做一支样片，顺便帮你选风格。
 
 收到视频后按第四节流程做；第一次试做可以只做 30–60 秒，先确认人物测量、头顶标题、小窗取景和底座都正常。
 
@@ -61,9 +61,10 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 | 部件 | 规则 |
 |-|-|
 | 画布 | 1080×1920、30fps。0–1576 是人物画面区，图解段也只在这一区排版；1576–1920 是底座。 |
-| 底座 | 全片常驻、盖在所有画面上面。平时显示章节进度条（3–6 章，编号＋章名，当前章点亮、下划线展开）；讲到需要更新或补充的事实时，换成「最新进展」卡（标题＋出处＋最多 2 个数字）。底座和人物画面交界处有一块署名牌。只放进度类和补充类信息，主要包装不放这里。 |
-| 字幕 | 得意黑 60px、白字、风格色阴影。人物段固定在 1300；图解段跟着版式走（横条下方、小窗上方或旁边），撞到小窗会自动让开或缩小字号。 |
-| 头顶标题 | 只放在头顶以上的空间。位置按实测头顶算，放不下就报错，改用身前卡片。头顶标题所在段自动关掉跳切推近。 |
+| 平台安全区 | 视频号、抖音、小红书都按铺满屏幕播放，手机比 9:16 瘦长，左右会被裁掉（视频号实测：iPhone 每边约 49 像素、主流安卓约 60）；顶部 0–270 是状态栏和返回键，底部 1483 以下是账号名、标题文案和进度条。除背景（实拍、底纹、全宽横条、人物画面）以外，字、脸、小窗、卡片、标签都在 **x 60–1020、y 270–1483** 里，文字离左右边至少 72。图解段背景之上的元素自动整体缩到 93% 落进安全区（版式仍按原坐标写）；人物段版式按这条线排。`om.py safe` 检查，越线必须改。详见 [references/04-人脸安全.md](references/04-人脸安全.md) 第 5 节。 |
+| 底座 | 全片常驻、盖在所有画面上面。平时显示章节进度条（3–6 章，编号＋章名，当前章点亮、下划线展开）；讲到需要更新或补充的事实时，换成「最新进展」卡（标题＋出处＋最多 2 个数字）。底座和人物画面交界处有一块署名牌。只放进度类和补充类信息，主要包装不放这里。底座的内容都排在 1576–1765：视频号播放时文案收起，但最下面约 150 像素仍有账号名和评论栏。 |
+| 字幕 | 得意黑 60px、白字、风格色阴影，左右各留 72。人物段固定在 1300；图解段跟着版式走（横条下方、小窗上方或旁边），撞到小窗会自动让开或缩小字号。 |
+| 头顶标题 | 只放一行核心信息（话题＋数字，或一组对比）；问句、口播原话交给字幕。只放在头顶以上、y 276 以下的空间（顶部 270 以内是平台状态栏和按钮），位置按实测头顶算，放不下就报错，改用身前卡片。背后是整条压暗：顶边 0.86、标题中线 0.74，从标题中线起按 smootherstep 曲线淡到 0（最长 340px，最低到额头），看不出压暗在哪里结束；纯中性黑，不加色调、不磨砂。头顶标题所在段自动关掉跳切推近。 |
 | 人物段元素 | 两侧标签贴在下巴两侧；身前卡片、名牌、数字、贴纸放在下巴以下；任何元素碰到头部范围（头顶到下巴、脸宽外扩 5%，按推近后的位置）build 直接失败。 |
 | 小窗 | 按这一段的人脸位置取景，脸完整、头顶留空，画面铺满窗口。圆窗直径 230–300，竖窗约 420×500 或 470×800。 |
 | 缓动 | 卡片、小窗、标签持续上下浮动（±6–10px、周期 3–4 秒、相邻元素错开）；透视面板和倾斜图表轻摆 2–4°。不允许画面静止。 |
@@ -156,7 +157,7 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 4. **前期**（`scripts/prep.py`）：`cut` → `voice` → `captions --transcript 工作目录/transcript_edl.json --fix fix.json` → `base --style 推荐风格`；B-roll 用 `broll`／`image` 逐条处理；最后 `mix` 配乐。
    - `cut` 给每段两头加 12 毫秒淡入淡出，接点没有咔哒声；同时写 `joins.json`，标出每个接点是停顿还是重说。重说接点离镜头切换 0.3 秒以内时，build 把镜头切换挪到接点上；落在人物段中间的，靠跳切推近换一次景别遮住。
 5. **量人物**：`python3 scripts/measure.py 工作目录/om_assets/aroll.mp4 geom.json`。macOS 用系统 Vision；Windows／Linux 用 MediaPipe（setup.py 已装）。
-6. **请用户选风格（问一次）**：`python3 scripts/style_preview.py --work 工作目录 --geom geom.json --transcript transcript.json --title "开头标题|*重点*" --sub "副标题" --phrase "片中一句金句" --account 账号`，约 40 秒。
+6. **请用户选风格（问一次）**：`python3 scripts/style_preview.py --work 工作目录 --geom geom.json --transcript transcript.json --title "开头标题|*重点*" --phrase "片中一句金句" --account 账号`，约 40 秒。
    - 出一张五套风格对照图：每套两格，用本人画面配头顶标题，再配一格图解金句。按转写内容标出推荐和备选，并写明理由（讲钱／机构／资源／品牌／科技各命中哪些词）。
    - 把图和推荐发给用户：「选哪套？回『你定』就用推荐的。」用户在请求里已经点名风格就跳过这一步。
    - 选定的不是第 4 步 `base` 用的风格时，重跑一次 `prep.py base --style 选定风格`。
@@ -164,18 +165,18 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 8. **找 B-roll**：免费可商用片库（Pexels／Pixabay）。内容要对得上，宁可用抽象画面也不用张冠李戴的实拍。
 9. **建工程**：`om.py create` → `om.py import --manifest 工作目录/import.json`（生成 `assets.json`）。
 10. **构建**：`python3 scripts/build.py plan.json --assets assets.json --geom geom.json --out out`。有错误就改分镜表重来，警告要逐条看。
-11. **自查**：`om.py stage` → `om.py lint`（必须 0 错误）→ `om.py check`（渲染器自带的完整检查，约 35 秒：文字互相压住或被盖住、超出画面、字和底色太接近、停留太短来不及读、字太小；每段入场后、段尾和每个动画起止都取帧。「必须改」要 0 处，「要看」逐条判断，是设计如此就写进交付说明）→ `om.py snapshot` 抽 12–15 帧，逐帧看：碰脸、空得太多、两段太像、整片的节奏和色调有没有随内容起伏。
+11. **自查**：`om.py stage` → `om.py lint`（必须 0 错误）→ `om.py check`（渲染器自带的完整检查，约 35 秒：文字互相压住或被盖住、超出画面、字和底色太接近、停留太短来不及读、字太小；每段入场后、段尾和每个动画起止都取帧。「必须改」要 0 处，「要看」逐条判断，是设计如此就写进交付说明）→ `om.py safe`（平台安全区，2 分钟的片子约 45 秒：元素越过左右 60、顶部 270、底部 1483 必须改；只在入场动画途中越线、文字离边不到 72 的列「要看」；越线的帧标出位置存在 `out/.safe/report/`）→ `om.py snapshot` 抽 12–15 帧，逐帧看：碰脸、空得太多、两段太像、整片的节奏和色调有没有随内容起伏。
 12. **存版本、打开编辑器**：`om.py save` → `om.py preview --open`。用户在 Studio 里可以直接改字、调时间、换素材。
 13. **导出**：`om.py export --out 成片.mp4`，等技术校验通过（14 项）。然后 `build.py --register` 登记。
 14. **交付**：成片路径、编辑器网址、制作说明（剪了什么、风格和版式、素材授权、事实依据、已知限制），以及 `edl_report.json` 的待听清单（时间＋原话，请人听）。
 
-**改了剪辑表要重剪时**（用户指出还有重说、改了 fix.json）：用户说的是成片时间，先 `python3 scripts/recut.py --work 工作目录 --where 成片秒数` 查出原片时间和那句的逐字时间，要剪的原片区间写进 fix.json 的 `"cut": [[起, 止]]`（重跑也保留，不要手改 edl.json）。然后 `python3 scripts/recut.py --work 工作目录 --plan plan.json --geom geom.json --out out`，一条命令按顺序重跑剪辑表、剪辑、人声、字幕、配乐、量人物、搬分镜表时间、导入、构建、检查、查剩下的重说，约 2–3 分钟。不要手动一步步重跑：漏掉导入会导出「新画面配旧声音」，手算分镜表时间容易搬错。几处问题攒在一起改完再重剪、再导出，不要改一处导一次。
+**改了剪辑表要重剪时**（用户指出还有重说、改了 fix.json）：用户说的是成片时间，先 `python3 scripts/recut.py --work 工作目录 --where 成片秒数` 查出原片时间和那句的逐字时间，要剪的原片区间写进 fix.json 的 `"cut": [[起, 止]]`（重跑也保留，不要手改 edl.json）。然后 `python3 scripts/recut.py --work 工作目录 --plan plan.json --geom geom.json --out out`，一条命令按顺序重跑剪辑表、剪辑、人声、字幕、配乐、量人物、搬分镜表时间、导入、构建、检查、安全区、查剩下的重说，约 2–3 分钟。不要手动一步步重跑：漏掉导入会导出「新画面配旧声音」，手算分镜表时间容易搬错。几处问题攒在一起改完再重剪、再导出，不要改一处导一次。
 
 重说／卡顿／口误的判据、剪法、复核口径见 [references/07-重说与口误.md](references/07-重说与口误.md)；各命令和跨平台细节见 [references/05-OpenMotion与跨平台.md](references/05-OpenMotion与跨平台.md)；人物测量和碰脸规则见 [references/04-人脸安全.md](references/04-人脸安全.md)。
 
 ## 五、交付前自验
 
-- lint 0 错误；`om.py check` 必须改 0 处、要看的逐条有交代；build_report.json 里 0 错误，警告逐条有交代。
+- lint 0 错误；`om.py check` 必须改 0 处、要看的逐条有交代；`om.py safe` 必须改 0 处；build_report.json 里 0 错误，警告逐条有交代。
 - 抽帧看过每一段；人物段没有任何元素压脸压头。
 - edl.py 自动剪掉的每一处复核都通过，接点检查 0 个不合格；待听清单已写进交付说明。
 - `python3 scripts/edl.py --scan 工作目录/om_assets/voice.wav` 显示没有重说（recut.py 会自动跑）。
@@ -187,7 +188,7 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 
 ## 文件
 
-- `scripts/`：setup.py 安装（先装 OpenMotion）、selftest.py 离线自检、prep.py 前期、edl.py 剪辑表和找重说（逐段转写比读音；`--scan` 只查不剪）、recut.py 改了剪辑表后一条命令重剪、measure.py＋measure.swift 人物测量、style_preview.py 五套风格对照图（开工时请用户选）、draft_plan.py 分镜表草稿、build.py 构建、om.py OpenMotion 调用（含 check 完整检查）、icons.py 图标搜索、gen_textures.py 底纹和 gen_sfx.py 音效（都已生成）
+- `scripts/`：setup.py 安装（先装 OpenMotion）、selftest.py 离线自检、prep.py 前期、edl.py 剪辑表和找重说（逐段转写比读音；`--scan` 只查不剪）、recut.py 改了剪辑表后一条命令重剪、measure.py＋measure.swift 人物测量、style_preview.py 五套风格对照图（开工时请用户选）、draft_plan.py 分镜表草稿、build.py 构建、om.py OpenMotion 调用（含 check 完整检查、safe 平台安全区检查）、icons.py 图标搜索、gen_textures.py 底纹和 gen_sfx.py 音效（都已生成）
 - `data/`：pinyin.txt 拼音字表、t2s.txt 繁简字表（都由系统转换生成，找重说时比读音用）、registry.json 账号登记
 - `lib/tujie/`：core 骨架工具、styles 五套风格、frame 底座字幕和主时间线、layouts_host 人物段版式、layouts_graphic 图解段版式
 - `assets/`：fonts（得意黑、Inter、Oswald、站酷小薇、志莽行书，均 OFL，许可证在旁边）、icons（Lucide，ISC）、textures 和 sfx（程序生成，无版权问题）

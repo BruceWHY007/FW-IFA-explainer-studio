@@ -150,9 +150,8 @@ def main():
         first = clip(ph[0], 10)
         last = clip(ph[-1], 10)
         if lay == "title_top":
+            # 头顶只放一行核心信息（话题＋数字）；后半句、问句交给字幕
             d = {"lines": [{"text": clip(t.split(" ")[0] if cls == "open" else first, 12), "cls": "T1", "t": round(s0 + 0.1, 2)}]}
-            if len(ph) > 1:
-                d["lines"].append({"text": clip(" ".join(ph[1:]), 14), "cls": "sub", "t": "@" + ph[1][:4]})
         elif lay == "plain":
             d = {}
         elif lay == "side_tags":
@@ -253,7 +252,7 @@ def main():
     motif = (motif + ["circle-dollar-sign", "trending-up", "landmark"])[:3]
     host_badge = [x for x in a.badge.split(",")] if a.badge else [a.host, ""]
     plan = {"title": a.title, "style": st.key, "account": a.account, "duration": dur, "aroll_duration": adur,
-            "captions": os.path.basename(a.captions), "caption_skip": [[0, ends[0]]],
+            "captions": os.path.basename(a.captions),
             "host": {"name": a.host, "badge": host_badge}, "chapters": chapters, "updates": [], "motif": motif, "segments": segs,
             "_todo": todo + ["每个 TODO 都要换成实际内容；英文副题按中文意思写", "检查每段版式是否贴合内容，参考 references/02 的「内容 → 调法」"]}
     if a.chartimes:

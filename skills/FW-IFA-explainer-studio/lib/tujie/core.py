@@ -13,6 +13,51 @@ CAP_Y = 1300          # 人物段字幕默认位置（字幕上沿）
 ZOOM = 1.08           # 跳切推近倍率
 MOTION = {"amp": 1.0}  # 当前段的缓动幅度倍数（段落层 energy 决定）
 TONES = {"good": "#43D69A", "bad": "#FF6A63", "warn": "#F5B83D", "info": "#6E9BFF"}
+# 平台安全区（视频号实测：iPhone 左右各裁约 49px、主流安卓约 60px；顶部状态栏和按钮、底部账号名和标题文案；见 references/04 第 5 节）
+# 除背景以外（实拍、底纹、全宽横条、人物画面），字、脸、小窗、卡片、标签都要在 x 60–1020、y 270–1483 里；底座单独排。
+SAFE_L, SAFE_R, SAFE_TOP, SAFE_BOTTOM, SAFE_TEXT = 60, 1020, 270, 1483, 72
+SAFE_X = 64           # 人物段元素离左右边的距离
+TITLE_TOP = 276       # 人物段头顶标题最高到这
+# 图解段：背景照常铺满，背景上的元素整体缩到 93%（以 (540, 1866) 为中心），
+# 设计区 x 24–1056、y 150–1440 正好落进安全区。版式坐标照旧按 1080×1576 写，超出设计区的元素 build 后由 om.py safe 查出。
+STAGE_K, STAGE_OY = 0.93, 1866
+BLEED_W = 1080 / STAGE_K          # 舞台里要铺满全宽的东西（横条、滚动条、光带）的宽度
+BLEED_X = -(BLEED_W - 1080) / 2   # 和它的左边位置
+BG_END = "<!--/bg-->"            # graphic_bg 输出的结尾标记：之前是背景，之后放进缩放层
+
+
+def stage_y(y):
+    return STAGE_OY + (y - STAGE_OY) * STAGE_K
+
+
+def stage_x(x):
+    return 540 + (x - 540) * STAGE_K
+
+
+_TAG = re.compile(r"<(/?)([a-zA-Z][\w-]*)((?:[^>\"']|\"[^\"]*\"|'[^']*')*?)(/?)>")
+_VOID = {"br", "img", "hr", "input", "meta", "link", "source", "wbr"}
+
+
+def split_stage(fg):
+    """把背景之后的 HTML 按最外层元素分开：整屏的装饰层（整屏底色、射线、滚动的母题排）留在缩放层外面，其余进缩放层。"""
+    out_bg, out_fg, depth, start = [], [], 0, None
+    for m in _TAG.finditer(fg):
+        close, name, attrs, selfc = m.group(1), m.group(2).lower(), m.group(3), m.group(4)
+        if depth == 0 and not close:
+            start = m.start()
+            open_attrs = attrs
+        if close:
+            depth -= 1
+        elif not selfc and name not in _VOID:
+            depth += 1
+        if depth == 0 and start is not None and (close or selfc or name in _VOID):
+            el = fg[start:m.end()]
+            a = open_attrs
+            bleed = ("data-safe-bleed" in a or ("data-layout-ignore" in a and not re.search(r'id="[^"]*-pb\d"', a))
+                     or ("id=" not in a and re.search(r'style="inset:0', a)))
+            (out_bg if bleed else out_fg).append(el)
+            start = None
+    return "".join(out_bg), "".join(out_fg)
 SKILL_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
@@ -197,6 +242,14 @@ class Film:
         hs = self.head_shift.get(cid)
         if hs:  # put_pip 发现小窗压标题时记下的挪位：标题区收窄到小窗另一侧
             body = body.replace(f'id="{cid}-head" class="head" style="', f'id="{cid}-head" class="head" style="{hs[0]}:{hs[1]:.0f}px;', 1)
+        if BG_END in body:  # 图解段：背景之后的元素放进缩放层，落进平台安全区
+            bg, fg = body.split(BG_END, 1)
+            deco, fg = split_stage(fg)
+            body = (bg + deco + f'<div id="{cid}-stage" class="stage" style="position:absolute;left:0;top:0;width:1080px;height:1920px;'
+                    f'transform-origin:540px {STAGE_OY}px;transform:scale({STAGE_K})">{fg}</div>')
+            for sg in self.segs:
+                if sg.id == cid:
+                    sg.staged = True
         html = f"""<template>
 <style>{self.base_css()}{self.st.css}{self.tone_css()}{css}</style>
 <div id="root" data-composition-id="{cid}" data-width="1080" data-height="1920">

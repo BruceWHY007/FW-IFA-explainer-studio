@@ -4,7 +4,8 @@
 
 用法（prep.py cut／captions／base 和 measure.py 跑完之后）：
   python3 scripts/style_preview.py --work 工作目录 --geom geom.json --transcript transcript.json \\
-      --title "香港定存|*3.6%*" --sub "你是不是也有点心动？" --phrase "每个条件|都不是废话" [--account 账号] [--out 对照图.jpg]
+      --title "一笔钱|*三种去处*" --phrase "先看条件|再看利率" [--account 账号] [--out 对照图.jpg]
+  --title 是头顶那一行：| 分成前后两段（前段次标题字、后段主标题字），排在同一行。
 产物：对照图（默认 工作目录/style_preview.jpg），终端打印推荐和理由。约 40 秒。
 Agent 把对照图和推荐发给用户问一次：「选哪套？回『你定』就用推荐的」。用户在请求里已经点名风格就不跑这一步。
 """
@@ -41,7 +42,7 @@ def recommend(text, account=None):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--work", required=True); ap.add_argument("--geom", required=True); ap.add_argument("--transcript", required=True)
-    ap.add_argument("--title", required=True, help="开头标题，| 换行，*…* 强调"); ap.add_argument("--sub", default="")
+    ap.add_argument("--title", required=True, help="开头标题，| 换行，*…* 强调"); ap.add_argument("--sub", default="", help="已不用：头顶只放一行，问句交给字幕")
     ap.add_argument("--phrase", required=True, help="片中一句金句或转折，图解段大字用，| 换行")
     ap.add_argument("--account"); ap.add_argument("--out")
     a = ap.parse_args()
@@ -67,10 +68,9 @@ def main():
     tr = json.load(open(a.transcript, encoding="utf-8"))
     text = "".join(s["text"] for s in (tr["sentences"] if isinstance(tr, dict) else tr))
     order, score, hits, last = recommend(text, a.account)
-    lines = a.title.split("|")
-    tl = [{"text": ln, "cls": "T2" if k == 0 and len(lines) > 1 else "T1", "t": round(0.1 + 0.25 * k, 2)} for k, ln in enumerate(lines)]
-    if a.sub:
-        tl.append({"text": a.sub, "cls": "sub", "t": 0.7})
+    parts = a.title.split("|")
+    sp = [[p_ + (" " if k < len(parts) - 1 else ""), "T2" if k == 0 and len(parts) > 1 else "T1"] for k, p_ in enumerate(parts)]
+    tl = [{"spans": sp, "t": 0.1}]
     shots = []
     for st in styles.STYLES:
         plan = {"title": "风格对照", "style": st, "duration": 6.4, "aroll_duration": 6.4, "captions": "captions.json",

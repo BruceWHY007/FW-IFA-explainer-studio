@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """自检：不用任何真人视频，生成占位素材（灰色人形剪影、渐变横条、配图），按 examples/demo 的分镜表把五套风格各构建一遍，
-有 OpenMotion 时再跑 lint、完整检查和抽帧；另外用占位句子测找重说的判定规则和重剪时的时间搬移。装完环境、改完代码都可以跑它确认链路通。
+有 OpenMotion 时再跑 lint、完整检查、平台安全区检查和抽帧；另外用占位句子测找重说的判定规则和重剪时的时间搬移。装完环境、改完代码都可以跑它确认链路通。
 
 用法：python selftest.py [--style tanjin] [--out 目录] [--snapshot]
   不写 --style 就五套都跑；--snapshot 抽 8 帧拼成总览图（每套约 30 秒）。
@@ -203,6 +203,11 @@ def main():
                 if cr.returncode:
                     ok_build = False
                     lint += "\n" + "\n".join(cr.stdout.strip().splitlines()[1:6])
+                sr = subprocess.run([sys.executable, os.path.join(HERE, "om.py"), "safe", "--dir", d], capture_output=True, text=True, encoding="utf-8")
+                lint += "；" + (sr.stdout.strip().splitlines() or ["?"])[0]
+                if sr.returncode:
+                    ok_build = False
+                    lint += "\n" + "\n".join(sr.stdout.strip().splitlines()[1:6])
                 if a.snapshot and lr.returncode == 0:
                     sd = os.path.join(OUT, f"snap_{tag}")
                     ats = "2.5,6.5,12.5,17.5,24,29,33.8,39" if pn == "demo" else "3.2,8.8,14.5,18.6,25.2,31.0,36.8,41.5"

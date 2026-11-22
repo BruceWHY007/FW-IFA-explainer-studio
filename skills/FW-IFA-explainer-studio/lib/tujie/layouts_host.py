@@ -5,7 +5,7 @@
   两侧标签  → 脸两侧、下巴高度，宽度按脸外侧剩余空间算
   身前元素  → 下巴以下
 """
-from .core import W, HOST_H, BuildError, chars, chars_in, esc, plain, rich, fit_fs, floaty, icon, tw
+from .core import W, HOST_H, BuildError, chars, chars_in, esc, plain, rich, fit_fs, floaty, icon, tw, SAFE_X, SAFE_TEXT, TITLE_TOP
 from .styles import brush_in
 
 TONES = {
@@ -35,13 +35,6 @@ def chin(film, seg):
     return fy + fh, fh
 
 
-def topshade(seg, bottom):
-    """头顶标题的压暗：标题下沿以上保持够深（亮窗、天空前面字也看得清），再往下 90px 渐隐，只扫到头发顶。"""
-    h = max(430, bottom + 90)
-    return (f'<div id="{seg.id}-shade" class="ab" style="left:0;right:0;top:0;height:{h:.0f}px;'
-            f'background:linear-gradient(180deg,rgba(6,8,12,.92) 0px,rgba(6,8,12,.8) {bottom:.0f}px,rgba(6,8,12,0) {h:.0f}px)"></div>')
-
-
 def span_html(sp):
     if isinstance(sp, str):
         return rich(sp)
@@ -54,53 +47,67 @@ def _line_text(ln):
 
 
 # ---------------------------------------------------------------- 头顶标题
-def title_top(film, seg):
-    """data.lines: [{spans:[[文字,类名],...] 或 text＋cls, t, size}]；cls 可用 T1/T2/TR/TB/sub。最多 3 行。"""
+def topshade(film, seg, y, fs):
+    """头顶标题的压暗：整条从画面顶边往下，标题区够深（亮窗、天空前面字也看得清），往下渐隐到额头。
+    深度：顶边 0.86、标题中线 0.74（比最早的 0.92／0.80 略浅），标题下沿约 0.70。
+    接缝：从标题中线开始用 smootherstep 曲线淡到 0，两头斜率都是 0，看不出压暗在哪里结束；
+    渐隐段尽量拉长（最多 340px，最低到额头、不压眼睛）。最早只有 90px，在头发上方断成一道硬边。
+    CSS 渐变在色标之间是直线，排 24 个色标贴近曲线。纯中性黑，不加色调、不磨砂、不垫暗晕（会发灰发脏）。"""
+    fx, fy, fw, fh = film.face_box(seg.start, seg.end)
+    mid = y + fs * 0.5
+    end = max(mid + 120, min(mid + 340, fy + fh * 0.1))
+    stops = [(0, 0.86), (mid, 0.74)]
+    for k in range(1, 25):
+        t = k / 24
+        e = t * t * t * (t * (t * 6 - 15) + 10)  # smootherstep
+        stops.append((mid + (end - mid) * t, 0.74 * (1 - e)))
+    grad = ",".join(f"rgba(6,8,12,{a_:.3f}) {yy:.0f}px" for yy, a_ in stops)
+    return (f'<div id="{seg.id}-shade" class="ab" data-safe-bleed data-layout-ignore style="left:0;top:0;width:1080px;height:{end + 2:.0f}px;opacity:0;'
+            f'background:linear-gradient(180deg,{grad})"></div>')
+
+
+def head_title(film, seg, ln, out=None):
+    """头顶一行标题＋整条压暗，返回 (body, script)。title_top 和 chest_cards 的头顶标题共用。"""
     seg.zoom = False
     st = film.st
-    top_lim = 150
+    txt, sp = _line_text(ln)
     head = film.head_top(seg.start, seg.end)
     bottom = head - 22
-    lines = seg.data.get("lines", [])
+    avail = bottom - TITLE_TOP
+    fs = min(ln.get("size", 112), fit_fs(txt, W - 2 * SAFE_TEXT, 112, 30), int(avail))
+    if fs < 56:
+        raise BuildError(f"{seg.id} 头顶只有 {avail:.0f}px，标题放不下（字号 {fs}px 太小）。缩短标题，或换成身前卡片 chest_cards")
+    y = TITLE_TOP + (avail - fs) / 2
+    lid = f"{seg.id}-l0"
+    rv = (ln.get("reveal") or seg.data.get("reveal")) == "chars"
+    inner = "".join(chars(t_, c_) for t_, c_ in sp) if rv else span_html(sp)
+    body = topshade(film, seg, y, fs)
+    body += (f'<div id="{lid}" class="ab" style="left:{SAFE_TEXT}px;right:{SAFE_TEXT}px;top:{y:.0f}px;text-align:center;white-space:nowrap;'
+             f'font:400 {fs}px/1 SM;letter-spacing:4px;opacity:0">{inner}</div>')
+    t_in = seg.at_t(ln, 0.05)
+    script = f'tl.fromTo("#{seg.id}-shade",{{opacity:0}},{{opacity:1,duration:0.4,ease:"power2.out"}},{max(0, t_in - 0.2):.3f});\n'
+    script += chars_in(f"#{lid}", t_in, len(plain(txt)), ln.get("per") or film.reveal_per(txt, seg, 0.06)) if rv else st.title_in(f"#{lid}", t_in)
+    film.sfx_at(seg, t_in, "swoosh")
+    film.zone(seg, "title", SAFE_TEXT, y, W - 2 * SAFE_TEXT, fs)
+    if out is not None:
+        script += st.out(f"#{lid}", seg.L(out))
+        script += f'tl.to("#{seg.id}-shade",{{opacity:0,duration:0.4,ease:"power2.in"}},{seg.L(out):.3f});\n'
+    return body, script
+
+
+def title_top(film, seg):
+    """头顶只放一行核心信息（话题＋数字，或一组对比）。问句、口播原话交给字幕。
+    data.lines: [{spans:[[文字,类名],...] 或 text＋cls, t, reveal, size}]，只认一行；cls 可用 T1/T2/TR/TB。"""
+    raw = seg.data.get("lines", [])
+    lines = [ln for ln in raw if ln.get("cls") != "sub"]
+    dropped = [ln.get("text") or "".join(t for t, _ in ln.get("spans", [])) for ln in raw if ln.get("cls") == "sub"]
+    if dropped:
+        film.warnings.append(f"{seg.id} 头顶只放一行：副标题「{'／'.join(dropped)}」没有上屏，这句交给字幕；要补充说明改用身前卡片")
     if not lines:
-        raise BuildError(f"{seg.id} title_top 没有 lines")
-    avail = bottom - top_lim
-    sizes = []
-    for ln in lines:
-        txt, _ = _line_text(ln)
-        base = 112 if ln.get("cls") != "sub" else 52
-        sizes.append(min(ln.get("size", base), fit_fs(txt, 980, base, 30)))
-    gap = 18
-    need = sum(sizes) + gap * (len(lines) - 1)
-    if need > avail:
-        k = avail / need
-        if k < 0.55:
-            raise BuildError(f"{seg.id} 头顶只有 {avail:.0f}px，放不下标题（需要 {need:.0f}px）。减少行数或换成身前卡片")
-        sizes = [int(s * k) for s in sizes]
-        need = sum(sizes) + gap * (len(lines) - 1)
-    y = top_lim + (avail - need) / 2
-    body = topshade(seg, bottom)
-    script = f'tl.fromTo("#{seg.id}-shade",{{opacity:0}},{{opacity:1,duration:0.3}},0);\n'
-    for k, ln in enumerate(lines):
-        txt, sp = _line_text(ln)
-        fs = sizes[k]
-        lid = f"{seg.id}-l{k}"
-        if ln.get("cls") == "sub":
-            body += (f'<div id="{lid}" class="ab" style="left:0;right:0;top:{y:.0f}px;text-align:center;font:400 {fs}px/1 SM;letter-spacing:3px;'
-                     f'color:{st.sub_color()};text-shadow:0 2px 4px rgba(0,0,0,.8),0 0 18px rgba(0,0,0,.6);opacity:0">{rich(txt)}</div>')
-            script += st.sub_in(f"#{lid}", seg.at_t(ln, 0.1 + k * 0.4))
-        else:
-            rv = (ln.get("reveal") or seg.data.get("reveal")) == "chars"
-            inner = "".join(chars(t_, c_) for t_, c_ in sp) if rv else span_html(sp)
-            body += (f'<div id="{lid}" class="ab" style="left:0;right:0;top:{y:.0f}px;text-align:center;white-space:nowrap;'
-                     f'font:400 {fs}px/1 SM;letter-spacing:3px;opacity:0">{inner}</div>')
-            tt = seg.at_t(ln, 0.05 + k * 0.4)
-            script += chars_in(f"#{lid}", tt, len(plain(txt)), ln.get("per") or film.reveal_per(txt, seg, 0.06)) if rv else st.title_in(f"#{lid}", tt)
-            film.sfx_at(seg, seg.at_t(ln, 0.05 + k * 0.4), "swoosh")
-        film.zone(seg, f"title{k}", 40, y, W - 80, fs)
-        y += fs + gap
-    if seg.data.get("out"):
-        script += st.out(f"#{seg.id}-l0" if len(lines) == 1 else ",".join(f"#{seg.id}-l{k}" for k in range(len(lines))), seg.L(seg.data["out"]))
+        raise BuildError(f"{seg.id} title_top 没有标题行")
+    if len(lines) > 1:
+        raise BuildError(f"{seg.id} 头顶只放一行核心信息（现在 {len(lines)} 行）：合成一行，或把后半句交给字幕、身前卡片")
+    body, script = head_title(film, seg, lines[0], seg.data.get("out"))
     film.scene(seg.id, body, script)
 
 
@@ -112,8 +119,8 @@ def side_tags(film, seg):
     hb = head_box(film, seg)
     c_y, fh = chin(film, seg)
     tag_h = 168
-    room_l = hb[0] - 30 - 16
-    room_r = W - (hb[0] + hb[2]) - 30 - 16
+    room_l = hb[0] - SAFE_X - 16
+    room_r = W - (hb[0] + hb[2]) - SAFE_X - 16
     tw_ = min(300, room_l, room_r)
     if tw_ < 220:
         raise BuildError(f"{seg.id} 脸两侧只剩 {tw_:.0f}px，放不下对立标签（至少 220px）。换成身前卡片 chest_cards")
@@ -133,7 +140,7 @@ def side_tags(film, seg):
         f'<div class="e" style="color:{col}">{rich(en)}</div></div>')
     body = (f'<div id="{seg.id}-cl" class="ab" data-layout-ignore style="left:0;top:0;width:110px;height:{HOST_H}px;overflow:hidden"><svg id="{seg.id}-cls" width="110" height="1840" style="position:absolute;left:0;top:0">{chev(lc)}</svg></div>'
             f'<div id="{seg.id}-cr" class="ab" data-layout-ignore style="right:0;top:0;width:110px;height:{HOST_H}px;overflow:hidden"><svg id="{seg.id}-crs" width="110" height="1840" style="position:absolute;left:0;top:0;transform:scaleX(-1)">{chev(rc)}</svg></div>'
-            + card("l", "left:30px", y_l, lc, lbg, *d["left"]) + card("r", "right:30px", y_r, rc, rbg, *d["right"]))
+            + card("l", f"left:{SAFE_X}px", y_l, lc, lbg, *d["left"]) + card("r", f"right:{SAFE_X}px", y_r, rc, rbg, *d["right"]))
     tl_, tr_ = seg.at("tl", 0.1), seg.at("tr", 0.8)
     s = (f'tl.fromTo("#{seg.id}-cls",{{y:-130}},{{y:0,duration:{seg.d:.2f},ease:"none"}},0);\n'
          f'tl.fromTo("#{seg.id}-crs",{{y:0}},{{y:-130,duration:{seg.d:.2f},ease:"none"}},0);\n'
@@ -145,8 +152,8 @@ def side_tags(film, seg):
     if d.get("push") is not None:
         s += (f'tl.to("#{seg.id}-cl",{{x:-22,duration:0.6,ease:"power2.out"}},{seg.L(d["push"])});\n'
               f'tl.to("#{seg.id}-cr",{{x:22,duration:0.6,ease:"power2.out"}},{seg.L(d["push"])});\n')
-    film.zone(seg, "left", 30, y_l - 10, tw_, tag_h + 20)
-    film.zone(seg, "right", W - 30 - tw_, y_r - 10, tw_, tag_h + 20)
+    film.zone(seg, "left", SAFE_X, y_l - 10, tw_, tag_h + 20)
+    film.zone(seg, "right", W - SAFE_X - tw_, y_r - 10, tw_, tag_h + 20)
     film.sfx_at(seg, tl_, "swoosh"); film.sfx_at(seg, tr_, "swoosh")
     film.scene(seg.id, body, s)
 
@@ -164,24 +171,16 @@ def chest_cards(film, seg):
     if top + ch > 1290:
         top = 1290 - ch
     gap = 12
-    cw = (W - 48 - gap * (n - 1)) / n
+    cw = (W - 2 * SAFE_X - gap * (n - 1)) / n
     body, s = "", ""
     if d.get("title"):
-        seg.zoom = False
-        head = film.head_top(seg.start, seg.end)
-        txt, sp = _line_text(d["title"])
-        fs = min(120, fit_fs(txt, 960, 120), int(head - 22 - 170))
-        if fs < 60:
-            raise BuildError(f"{seg.id} 头顶空间不够放标题")
-        body += topshade(seg, head - 22)
-        body += (f'<div id="{seg.id}-h" class="ab" style="left:0;right:0;top:{170 + (head - 22 - 170 - fs) / 2:.0f}px;text-align:center;white-space:nowrap;'
-                 f'font:400 {fs}px/1 SM;letter-spacing:6px;opacity:0">{span_html(sp)}</div>')
-        s += f'tl.fromTo("#{seg.id}-shade",{{opacity:0}},{{opacity:1,duration:0.3}},0);\n' + st.title_in(f"#{seg.id}-h", seg.at_t(d["title"], 0.1))
-        film.zone(seg, "title", 40, 170, W - 80, fs)
+        b_, s_ = head_title(film, seg, d["title"])
+        body += b_
+        s += s_
     times = seg.times(cards, first=0.6)
     fs = min(52, fit_fs(max((c["zh"] for c in cards), key=tw), cw - 40, 52, 30))
     for k, c in enumerate(cards):
-        x = 24 + k * (cw + gap)
+        x = SAFE_X + k * (cw + gap)
         tag = f'<div id="{seg.id}-t{k}" class="tag" style="left:22px;top:-30px;opacity:0">{rich(c["tag"])}</div>' if c.get("tag") else ""
         body += (f'<div id="{seg.id}-c{k}f" class="fl" style="left:{x:.0f}px;top:{top:.0f}px;width:{cw:.0f}px;height:{ch}px">'
                  f'<div id="{seg.id}-c{k}" class="card" style="left:0;top:0;width:{cw:.0f}px;height:{ch}px;padding:{(ch - fs - 30) / 2:.0f}px 0 0;text-align:center;opacity:0">'
@@ -199,7 +198,7 @@ def chest_cards(film, seg):
         s += floaty(f"#{seg.id}-c{k}f", seg.d, 7, 3.2, k * 0.7)
     if d.get("all_on"):
         s += f'tl.to([{",".join(chr(34) + "#" + seg.id + "-c" + str(k) + "-g" + chr(34) for k in range(n))}],{{opacity:1,duration:0.3}},{seg.L(d["all_on"])});\n'
-    film.zone(seg, "cards", 24, top - 34, W - 48, ch + 34)
+    film.zone(seg, "cards", SAFE_X, top - 34, W - 2 * SAFE_X, ch + 34)
     film.scene(seg.id, body, s)
 
 
