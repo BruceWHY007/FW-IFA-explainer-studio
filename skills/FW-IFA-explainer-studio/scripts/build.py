@@ -19,6 +19,7 @@ from tujie.core import Film, BuildError  # noqa: E402
 from tujie import frame  # noqa: E402
 from tujie.layouts_host import HOST_LAYOUTS, head_box  # noqa: E402
 from tujie.layouts_graphic import GRAPHIC_LAYOUTS  # noqa: E402
+from tujie.forms import FORMS  # noqa: E402  卡牌、清单自己的做法
 
 LIMITS = {"band": 4, "quote": 3, "chapter": 4, "ending": 1}
 DEFAULT_LIMIT = 2
@@ -205,7 +206,7 @@ def main():
                 auto_log[s.id] = got
     for s in film.segs:
         film.prepare(s)
-        fn = (HOST_LAYOUTS if s.kind == "host" else GRAPHIC_LAYOUTS).get(s.layout)
+        fn = FORMS.get(film.st.key, {}).get(s.layout) or (HOST_LAYOUTS if s.kind == "host" else GRAPHIC_LAYOUTS).get(s.layout)  # 卡牌、清单自己的做法优先
         if not fn:
             errors.append(f"{s.id}：没有版式 {s.layout}（人物段可用 {', '.join(HOST_LAYOUTS)}；图解段可用 {', '.join(GRAPHIC_LAYOUTS)}）")
             continue

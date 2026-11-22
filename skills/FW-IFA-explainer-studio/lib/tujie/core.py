@@ -213,9 +213,11 @@ class Film:
     # ------------------------------------------------------------ 写场景
     def base_css(self):
         f = []
-        for fam, key in (("SM", "font_sm"), ("EN", "font_en"), ("NUM", "font_num"), ("SR", "font_sr"), ("BR", "font_br")):
+        for fam, key in (("SM", "font_sm"), ("EN", "font_en"), ("NUM", "font_num"), ("SR", "font_sr"), ("BR", "font_br"), ("HB", "font_hb"), ("HM", "font_hm")):
             if self.has(key):
                 f.append(f"@font-face{{font-family:{fam};src:url('{self.a(key)}')}}")
+            elif fam in ("HB", "HM") and self.has("font_sm"):  # 标准粗体（阿里巴巴普惠体／MiSans）没装：退回得意黑
+                f.append(f"@font-face{{font-family:{fam};src:url('{self.a('font_sm')}')}}")
         return "\n".join(f) + """
 *{box-sizing:border-box}
 #root{position:absolute;inset:0;overflow:hidden}

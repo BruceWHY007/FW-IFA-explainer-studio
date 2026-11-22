@@ -35,9 +35,9 @@ def graphic_bg(film, seg, photo=None, dim=None, pattern=None):
     photo = photo or seg.bg
     if photo:
         is_video = film.a(photo).lower().endswith((".mp4", ".mov", ".webm"))
-        filt = {"dangan": "grayscale(.35) sepia(.35) brightness(.6)", "kuangshi": "grayscale(.5) brightness(.55)",
-                "cilan": "saturate(.8) brightness(.75)", "nihong": "saturate(1.1) brightness(.6)"}.get(st, "brightness(.7)")
-        d0 = {"tanjin": .38, "dangan": .32, "kuangshi": .42, "cilan": .35, "nihong": .4}[st] if dim is None else dim
+        filt = {"dangan": "grayscale(.35) sepia(.35) brightness(.6)", "kapai": "saturate(.85) brightness(.62)",
+                "cilan": "saturate(.8) brightness(.75)", "qingdan": "saturate(.9) brightness(.6)"}.get(st, "brightness(.7)")
+        d0 = {"tanjin": .38, "dangan": .32, "kapai": .4, "cilan": .35, "qingdan": .42}[st] if dim is None else dim
         if is_video:
             body += (f'<video id="{seg.id}-bg" class="clip" data-layout-ignore data-start="0" data-duration="{seg.d:.3f}" src="{film.a(photo)}" muted playsinline '
                      f'style="position:absolute;left:-60px;top:-60px;width:1200px;height:2040px;object-fit:cover;filter:{filt}"></video>')
@@ -47,11 +47,13 @@ def graphic_bg(film, seg, photo=None, dim=None, pattern=None):
         body += f'<div class="ab" data-layout-ignore style="inset:0;background:rgba(0,0,0,{d0})"></div>'
         script += drift(f"#{seg.id}-bg", seg.d)
     if pattern is None:
-        pattern = st in ("cilan", "nihong") and not photo
-    if pattern:
-        body += motif_pattern(film, seg)
+        pattern = st in ("cilan", "kapai") and not photo
+    if pattern:  # 卡牌：大号品牌纹样平铺（参考片的星巴克女神纹）
+        body += motif_pattern(film, seg, size=104, gap=230, rot=0) if st == "kapai" else motif_pattern(film, seg)
         script += f'tl.fromTo("#{seg.id}-motif",{{y:0}},{{y:-150,duration:{seg.d:.2f},ease:"none"}},0);\n'
     body += '<div class="vig" data-layout-ignore></div>'
+    if st == "qingdan":  # 清单：黑底细点阵
+        body += '<div class="qddots" data-layout-ignore></div>'
     if st in ("tanjin", "dangan"):
         body += '<div class="grain" data-layout-ignore></div>'
     return body + BG_END, script  # 标记之后的元素放进缩放层，落进平台安全区（core.Film.scene）

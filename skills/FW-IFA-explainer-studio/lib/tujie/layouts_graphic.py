@@ -50,14 +50,14 @@ def put_pip(film, seg, spec, t=0.25, amp=9):
 
 
 def style_pip(film, seg, region="free"):
-    """各风格的默认小窗：炭金左下大圆、档案右上白边圆、矿石居中圆角方、瓷蓝左上圆、霓虹左下竖窗。"""
+    """各风格的默认小窗：炭金左下大圆、档案右上白边圆、瓷蓝左上圆；卡牌、清单右上小圆（参考片里小窗一直挂在右上角）。"""
     k = film.st.key
     if k == "tanjin":
         return ("circle", 30, 980, 290, 290)
     if k == "dangan":
         return ("circle", W - 36 - 250, 162, 250, 250)
-    if k == "kuangshi":
-        return ("squircle", (W - 270) / 2, 1140, 270, 270)
+    if k in ("kapai", "qingdan"):
+        return ("circle", W - 60 - 180, 168, 180, 180)
     if k == "cilan":
         return ("circle", 36, 162, 230, 230)
     return ("rect", 30, 1040, 240, 300)
@@ -132,9 +132,9 @@ def bigword_band(film, seg):
 BAND_GEO = {  # 横条位置、小窗、字幕位置
     "tanjin": (380, ("circle", 30, 840, 280, 280), CAP_Y),
     "dangan": (280, ("circle", W - 36 - 240, 162, 240, 240), None),
-    "kuangshi": (200, ("squircle", (W - 300) / 2, 958, 300, 300), None),
+    "kapai": (190, ("circle", W - 60 - 180, 168, 180, 180), None),
     "cilan": (330, ("circle", 36, 220, 220, 220), None),
-    "nihong": (360, ("rect", 30, 760, 230, 290), CAP_Y),
+    "qingdan": (190, ("circle", W - 60 - 180, 168, 180, 180), None),
 }
 
 
@@ -216,8 +216,6 @@ def band_scene(film, seg):
     body += ph
     s += ps
     seg.cap_y_set = cap if cap else by + bh + 34
-    if st.key == "kuangshi":
-        seg.cap_y_set = by + 608 + 24
     film.scene(seg.id, body, s)
 
 
@@ -498,7 +496,7 @@ def tilt_chart(film, seg):
     ys = [600 - 470 * (v - vmin) / max(1e-6, vmax - vmin) for v in vals]
     pts = " ".join(f"{x:.0f},{y:.0f}" for x, y in zip(xs, ys))
     a = st.c["a"]
-    lc = {"nihong": a, "cilan": st.c.get("lt", a)}.get(st.key, "#A9C1FF")
+    lc = {"kapai": a, "cilan": st.c.get("lt", a)}.get(st.key, "#A9C1FF")
     bg, s = graphic_bg(film, seg)
     spike = ""
     if d.get("spike"):
@@ -889,9 +887,9 @@ def _compare_side(film, seg):
                    f'<div class="ab numt" style="left:26px;top:96px;font-size:{fsv}px">{rich(p["value"])}</div>{icons}</div></div>')
     body += panels
     if d.get("mult"):
-        my = 1010 if st.key == "kuangshi" else 1040
-        body += f'<div id="{seg.id}-m" class="ab T1" style="left:0;right:0;top:{my}px;text-align:center;font-size:{110 if st.key == "kuangshi" else 130}px;line-height:1;opacity:0">{rich(d["mult"]["text"])}</div>'
-    ph, ps = put_pip(film, seg, pip_spec(film, seg, style_pip(film, seg) if st.key != "kuangshi" else ("squircle", (W - 240) / 2, 1190, 240, 240)))
+        my = 1040
+        body += f'<div id="{seg.id}-m" class="ab T1" style="left:0;right:0;top:{my}px;text-align:center;font-size:{130}px;line-height:1;opacity:0">{rich(d["mult"]["text"])}</div>'
+    ph, ps = put_pip(film, seg, pip_spec(film, seg, style_pip(film, seg)))
     body += ph
     ta, tb = seg.at("t_a", 0.3), seg.at("t_b", seg.d * 0.45)
     s += st.card_in(f"#{seg.id}-a", ta, 0, rng, "left") + f'tl.fromTo("#{seg.id}-a-g",{{opacity:0}},{{opacity:1,duration:0.3}},{ta + 0.3:.3f});\n'
@@ -903,7 +901,7 @@ def _compare_side(film, seg):
         mt = seg.at_t(d["mult"], tb + 1.0)
         s += st.title_in(f"#{seg.id}-m", mt)
         film.sfx_at(seg, mt, "impact")
-    seg.cap_y_set = 1330 if st.key != "kuangshi" else 1150
+    seg.cap_y_set = 1330
     film.scene(seg.id, body, s)
 
 
@@ -979,7 +977,7 @@ def ring_full(film, seg):
     film.scene(seg.id, body, s)
 
 
-# ================================================================ 16 霓虹产品排
+# ================================================================ 16 产品排
 def product_row(film, seg):
     """data: title{zh,en}, items[{label,sub,icon,t}]（3–4，比如三代产品、三个阶段）。"""
     d = seg.data
@@ -1001,7 +999,7 @@ def product_row(film, seg):
                   f'<div class="e">{rich(it.get("sub", ""))}</div></div></div>')
     body += f'<div id="{seg.id}-row" class="ab" style="left:0;top:0;width:1080px;height:1576px">{cards}</div>'
     body += f'<div class="ab" style="left:46px;right:46px;top:1060px;height:2px;background:linear-gradient(90deg,transparent,{a},transparent);box-shadow:0 0 12px {a}"></div>'
-    ph, ps = put_pip(film, seg, pip_spec(film, seg, style_pip(film, seg) if st.key != "kuangshi" else ("squircle", (W - 260) / 2, 1110, 260, 260)))
+    ph, ps = put_pip(film, seg, pip_spec(film, seg, style_pip(film, seg)))
     body += ph
     s += head_in(film, seg) + ps
     s += f'tl.set("#{seg.id}-row",{{transformPerspective:1600}},0);\ntl.fromTo("#{seg.id}-row",{{rotationY:-14}},{{rotationY:-6,duration:{seg.d:.2f},ease:"none"}},0);\n'
@@ -1211,7 +1209,7 @@ def compare(film, seg):
         mt = seg.at_t(d["mult"], tb + 1.0)
         s += st.title_in(f"#{seg.id}-m", mt)
         film.sfx_at(seg, mt, "impact")
-    seg.cap_y_set = 1330 if st.key != "kuangshi" else 1150
+    seg.cap_y_set = 1330
     film.scene(seg.id, body, s)
 
 

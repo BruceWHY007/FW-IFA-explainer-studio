@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """生成风格底纹（程序生成，没有版权问题）。一般不用重跑，assets/textures 里已经有成品。
 用法：python3 gen_textures.py [输出目录]
-  stone.jpg    矿石：石墨岩面（分形噪声＋浮雕光照）
+  stone.jpg    石墨岩面（分形噪声＋浮雕光照，备用底纹）
   archive.jpg  档案：暖黑纤维纸面
 """
 import os, sys

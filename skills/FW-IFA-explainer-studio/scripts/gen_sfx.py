@@ -4,9 +4,9 @@
 每套 6 个：soft 段落过渡、snap 点亮／轻点、swoosh 短滑入、whoosh 长滑入、impact 重音、click 卡片／更新卡
   炭金：暖色电影感——气流、低频闷击
   档案：纸张滑动、橡皮章、打字机
-  矿石：金属撞击、石头摩擦、低频轰鸣
+  卡牌：金属感的落定、清脆的翻牌
   瓷蓝：瓷器轻鸣、柔和的气流和弹出
-  霓虹：合成器上扬、数字提示音、激光下滑
+  清单：数码感的打勾和提示音
 """
 import os, subprocess, sys, tempfile, wave
 import numpy as np
@@ -160,7 +160,7 @@ def dangan():
     }
 
 
-def kuangshi():
+def kapai():  # 金线黑卡：金属感的落定和清脆的翻牌
     return {
         "impact": reverb(mix(partials([110, 287, 451, 733, 1180, 1710], 1.6, [2.0, 2.6, 3.2, 4.5, 6, 8], [0.9, 0.7, 0.55, 0.4, 0.3, 0.2]),
                              sine(np.linspace(60, 38, int(SR * 1.0)), 1.0) * adsr(int(SR * 1.0), 0.003, 0.7, 3.0) * 0.9,
@@ -186,7 +186,7 @@ def cilan():
     }
 
 
-def nihong():
+def qingdan():  # 对照表：数码感的打勾和提示音
     riser_f = 110 * (4 ** np.linspace(0, 1, int(SR * 0.72)) ** 1.5)
     return {
         "whoosh": reverb(sweep(0.72, 300, 6000, 0.7, 1.4, src=saw(riser_f, 0.72) + noise(0.72) * 0.2) * swell(int(SR * 0.72), 0.8, 1.4), 0.6, 0.2),
@@ -228,7 +228,7 @@ def write_mp3(x, path):
 
 
 if __name__ == "__main__":
-    for name, fn in (("tanjin", tanjin), ("dangan", dangan), ("kuangshi", kuangshi), ("cilan", cilan), ("nihong", nihong)):
+    for name, fn in (("tanjin", tanjin), ("dangan", dangan), ("kapai", kapai), ("cilan", cilan), ("qingdan", qingdan)):
         d = os.path.join(OUT, name)
         os.makedirs(d, exist_ok=True)
         for kind, x in fn().items():

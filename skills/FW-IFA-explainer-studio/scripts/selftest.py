@@ -12,7 +12,7 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 import om  # noqa: E402
 
-STYLES = ["tanjin", "dangan", "kuangshi", "cilan", "nihong"]
+STYLES = ["tanjin", "dangan", "kapai", "cilan", "qingdan"]
 DUR = 40
 # 占位人形：头（椭圆）中心 (540,700)，脸框按「眉到下巴」取
 HEAD = (540, 700, 150, 185)
@@ -141,6 +141,12 @@ def main():
               "tex_stone": "assets/tex/stone.jpg", "tex_archive": "assets/tex/archive.jpg"}
     for k in (1, 2, 3):
         assets[f"thumb_demo{k}"] = f"assets/demo/thumb_demo{k}.jpg"
+    import prep  # 本机装了阿里巴巴普惠体／MiSans 就拿来测卡牌、清单的标题字（不复制进技能）
+    for key, (_, pats) in prep.BOLD_FONTS.items():
+        p = prep.local_font(pats)
+        if p:
+            shutil.copy(p, os.path.join(A, "fonts", os.path.basename(p)))
+            assets[key] = f"assets/fonts/{os.path.basename(p)}"
     sfx_src = os.path.join(ROOT, "assets", "sfx")
     if os.path.isdir(sfx_src):
         shutil.copytree(sfx_src, os.path.join(A, "sfx_style"), dirs_exist_ok=True)

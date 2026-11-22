@@ -329,8 +329,36 @@ def cmd_mix(a):
     print(f"bgm.wav {dur:.1f}s，响度 {li[-1] if li else '?'} LUFS（人声 −16，配乐建议 −29 到 −33）")
 
 
+BOLD_FONTS = {  # 卡牌、清单的标题和字幕用标准粗体。两种字体都能免费商用，但协议不许随技能再分发，只用本机装好的
+    "font_hb": ("阿里巴巴普惠体 Heavy", ["alibaba-puhuiti-heavy", "alibabapuhuiti-3-105-heavy", "alibabapuhuiti-3-115-black", "misans-heavy"]),
+    "font_hm": ("阿里巴巴普惠体 Bold", ["alibaba-puhuiti-bold", "alibabapuhuiti-3-85-bold", "misans-bold", "misans-demibold"]),
+}
+
+
+def local_font(patterns):
+    """在本机字体目录里找字体文件（macOS／Windows／Linux）。找不到返回 None。"""
+    dirs = [os.path.expanduser("~/Library/Fonts"), "/Library/Fonts", os.path.expanduser("~/.local/share/fonts"), os.path.expanduser("~/.fonts"),
+            "/usr/share/fonts", os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts"),
+            os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "Windows", "Fonts")]
+    for pat in patterns:
+        for d in dirs:
+            if not d or not os.path.isdir(d):
+                continue
+            for root, _, files in os.walk(d):
+                for f in files:
+                    if f.lower().startswith(pat) and f.lower().endswith((".otf", ".ttf")):
+                        return os.path.join(root, f)
+    return None
+
+
 def cmd_base(a):
     F = os.path.join(ROOT, "assets", "fonts")
+    for key, (nm, pats) in BOLD_FONTS.items():
+        p = local_font(pats)
+        if p:
+            manifest_add(a.work, key, p, f"{nm}（本机字体，不随技能分发）")
+        else:
+            print(f"没找到 {nm}：卡牌、清单的标题会退回得意黑。建议先装阿里巴巴普惠体（https://www.alibabafonts.com）或 MiSans（https://hyperos.mi.com/font）再跑一次 base")
     for key, f, lic, nm in (("font_sm", "SmileySans-Oblique.otf", "SmileySans-OFL.txt", "得意黑 Smiley Sans"),
                             ("font_en", "Inter.ttf", "Inter-OFL.txt", "Inter"),
                             ("font_num", "Oswald.ttf", "Oswald-OFL.txt", "Oswald"),
@@ -341,7 +369,7 @@ def cmd_base(a):
     manifest_add(a.work, "tex_stone", os.path.join(T, "stone.jpg"), "底纹－石墨岩面")
     manifest_add(a.work, "tex_archive", os.path.join(T, "archive.jpg"), "底纹－暖黑纸面")
     n = 0
-    styles = [a.style] if a.style else ["tanjin", "dangan", "kuangshi", "cilan", "nihong"]
+    styles = [a.style] if a.style else ["tanjin", "dangan", "kapai", "cilan", "qingdan"]
     for st in styles:  # 各风格自己的音效（程序合成，随技能附带）
         for kind in ("soft", "snap", "swoosh", "whoosh", "impact", "click"):
             p = os.path.join(ROOT, "assets", "sfx", st, kind + ".mp3")
