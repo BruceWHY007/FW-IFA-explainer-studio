@@ -1,6 +1,6 @@
 ---
 name: FW-IFA-explainer-studio
-description: 把一条真人口播原片做成「图解口播」竖版成片（财经知识类的图解包装：深色电影感、玻璃卡、金属大字、中英双语标题、人物小窗、透视图表、持续缓动），基于 OpenMotion 出可编辑工程。一套统一骨架（底座章节进度条、字幕位置、头顶标题不压人、人脸安全取景、缓动语法）＋五套风格包（炭金／档案／矿石／瓷蓝／霓虹），每支片按内容挑版式、母题图标和强调色，同风格也不出一模一样的片子。macOS／Windows 通用；使用前先装基础 OpenMotion（https://github.com/nexu-io/openmotion，scripts/setup.py 一键装）。用户说「图解口播」「知识口播包装」「财经口播加图解」「用 OpenMotion 做口播」「五套风格里选一套」时使用。没有原片、要从文稿生成整片，或只写口播稿，不归这里。
+description: 把一条真人口播原片做成「图解口播」竖版成片（财经知识类的图解包装：深色电影感、玻璃卡、金属大字、中英双语标题、人物小窗、透视图表、持续缓动），基于 OpenMotion 出可编辑工程。一套统一骨架（底座章节进度条、字幕位置、头顶标题不压人、人脸安全取景、缓动语法）＋五套风格包（炭金／档案／卡牌／瓷蓝／清单），每支片按内容挑版式、母题图标和强调色，同风格也不出一模一样的片子。macOS／Windows 通用；使用前先装基础 OpenMotion（https://github.com/nexu-io/openmotion，scripts/setup.py 一键装）。用户说「图解口播」「知识口播包装」「财经口播加图解」「用 OpenMotion 做口播」「五套风格里选一套」时使用。没有原片、要从文稿生成整片，或只写口播稿，不归这里。
 ---
 
 # FW-IFA 图解口播 · explainer-studio
@@ -16,13 +16,13 @@ description: 把一条真人口播原片做成「图解口播」竖版成片（�
 - GitHub：https://github.com/nexu-io/openmotion
 - 安装说明（npm 发布版，本技能用这个）：https://github.com/nexu-io/openmotion/blob/main/docs/install.md
 - 版本号和校验值：https://releases.open-design.ai/motion
-- 本技能在 `@openmotion/app` **0.1.1** 上测试通过。源码安装需要 Node 26，不推荐。
+- 本技能在 `@openmotion/app` **0.2.1** 上测试通过。源码安装需要 Node 26，不推荐。
 
 **第一步：运行安装脚本**
 
 ```
 python3 scripts/setup.py --check      # 只检查，看缺什么
-python3 scripts/setup.py              # 装：OpenMotion 0.1.1 接到 Claude Code＋本技能依赖＋自检
+python3 scripts/setup.py              # 装：OpenMotion 0.2.1 接到 Claude Code＋本技能依赖＋自检
 python3 scripts/setup.py --host claude --host codex --host deepseek --profile desktop   # 多个 Agent 一起接
 ```
 
@@ -30,7 +30,7 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 1. 查 Node 22.18+ 和 ffmpeg。缺了只给出安装命令，不替你装。
 2. 装 Pillow；Windows／Linux 还装 MediaPipe。
 3. 找本机 Chrome。
-4. 用官方命令装 OpenMotion：`npx --yes --package @openmotion/app@0.1.1 openmotion setup --host …`。
+4. 用官方命令装 OpenMotion：`npx --yes --package @openmotion/app@0.2.1 openmotion setup --host …`。
 5. 跑 `om.py doctor` 自检。
 
 接 Codex 时，如果已经用 claude 宿主装过，脚本只登记 MCP，不再复制一份技能，免得 Codex 读到两份。已经装过的机器，跑 `setup.py --check` 确认即可。
@@ -51,7 +51,7 @@ python3 scripts/setup.py --host claude --host codex --host deepseek --profile de
 | ffmpeg／ffprobe | `brew install ffmpeg` | `winget install Gyan.FFmpeg` |
 | Python 3.9–3.12＋Pillow | 系统自带 3.9＋`pip install pillow` | `py -3.11 -m pip install pillow` |
 | 人物测量 | 系统自带 Vision，不用装 | `py -3.11 -m pip install mediapipe==0.10.14 opencv-python-headless` |
-| **OpenMotion 0.1.1** | `npx --yes --package @openmotion/app@0.1.1 openmotion setup --host claude --skills-dir ~/.agents/skills` | 同一条命令 |
+| **OpenMotion 0.2.1** | `npx --yes --package @openmotion/app@0.2.1 openmotion setup --host claude --skills-dir ~/.agents/skills` | 同一条命令 |
 | Chrome | 有就用本机的 | 有就用本机的；没有时 OpenMotion 会自己下载，走代理可能失败，先装 Chrome 更稳 |
 
 详见 [references/05-OpenMotion与跨平台.md](references/05-OpenMotion与跨平台.md)。

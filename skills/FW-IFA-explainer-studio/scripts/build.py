@@ -264,7 +264,7 @@ def main():
         reg[plan["account"]].append({"title": film.title, "style": film.st.key, "accent": film.st.acc_key, "motif": film.motif,
                                                      "graphic": [s.layout for s in film.segs if s.kind == "graphic"]})
         json.dump(reg, open(reg_p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    n = len(os.listdir(os.path.join(a.out, "compositions")))
+    n = len([f for f in os.listdir(os.path.join(a.out, "compositions")) if not f.startswith("._")])
     print(f"✓ {film.st.name}·{film.st.acc_key}：{len(film.segs)} 段、{n} 个合成、{len(film.sfx)} 个音效、{len(film.zones)} 个人物区元素已过碰脸检查")
 
 

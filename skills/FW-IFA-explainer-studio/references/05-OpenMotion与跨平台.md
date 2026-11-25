@@ -32,13 +32,15 @@
 
 基础是 OpenMotion：GitHub https://github.com/nexu-io/openmotion ，npm 发布版安装说明 https://github.com/nexu-io/openmotion/blob/main/docs/install.md ，版本和校验值 https://releases.open-design.ai/motion 。
 
-最省事的是运行 `scripts/setup.py`（先 `--check` 看缺什么）。它装 OpenMotion 0.1.1（本技能测过的版本）和本技能的依赖，最后自检。下面是手动步骤。
+最省事的是运行 `scripts/setup.py`（先 `--check` 看缺什么）。它装 OpenMotion 0.2.1（本技能测过的版本）和本技能的依赖，最后自检。下面是手动步骤。
+
+OpenMotion 0.2.1 官方支持的系统是 macOS（Apple 芯片）和 Windows 11（x64），都要 Node 22.18+。
 
 ### macOS
 
 ```bash
 brew install ffmpeg                                   # 有就跳过
-npx --yes --package "@openmotion/app@0.1.1" openmotion setup --host claude --skills-dir ~/.agents/skills   # 需要 Node 22.18+
+npx --yes --package "@openmotion/app@0.2.1" openmotion setup --host claude --skills-dir ~/.agents/skills   # 需要 Node 22.18+
 python3 ~/.agents/skills/IFA图解口播/scripts/om.py doctor
 ```
 
@@ -50,7 +52,7 @@ OpenMotion 默认装在 `~/.local/share/openmotion`。om.py 调用时会把本�
 winget install OpenJS.NodeJS.LTS        # Node 22.18+
 winget install Gyan.FFmpeg              # ffmpeg / ffprobe 进 PATH
 winget install Google.Chrome            # 没有也行，HyperFrames 会自己下载一份
-npx --yes --package "@openmotion/app@0.1.1" openmotion setup --host claude --skills-dir ~/.agents/skills
+npx --yes --package "@openmotion/app@0.2.1" openmotion setup --host claude --skills-dir ~/.agents/skills
 py -3.11 -m pip install mediapipe==0.10.14 opencv-python-headless pillow
 py ~\.agents\skills\IFA图解口播\scripts\om.py doctor
 ```

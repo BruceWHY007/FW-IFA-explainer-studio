@@ -192,7 +192,7 @@ def cmd_save(a):
     files = [{"path": "index.html", "content": open(os.path.join(a.dir, "index.html"), encoding="utf-8").read()}]
     cdir = os.path.join(a.dir, "compositions")
     for f in sorted(os.listdir(cdir)):
-        if f.endswith(".html"):
+        if f.endswith(".html") and not f.startswith("._"):  # ._ 开头是 macOS 在 exFAT／网络盘上生成的资源副本，不是网页
             files.append({"path": f"compositions/{f}", "content": open(os.path.join(cdir, f), encoding="utf-8").read()})
     if len(files) > 100:
         sys.exit("一次最多存 100 个文件，合并部分段落再存")
@@ -345,9 +345,11 @@ def safe_variant(src, dst, css):
         if os.path.exists(os.path.join(src, f)):
             shutil.copy(os.path.join(src, f), os.path.join(dst, f))
     for f in os.listdir(os.path.join(src, "compositions")):
+        if f.startswith("._"):
+            continue
         shutil.copy(os.path.join(src, "compositions", f), os.path.join(dst, "compositions", f))
     link_dir(os.path.realpath(os.path.join(src, "assets")), os.path.join(dst, "assets"))
-    for f in ["index.html"] + ["compositions/" + x for x in os.listdir(os.path.join(dst, "compositions")) if x.endswith(".html")]:
+    for f in ["index.html"] + ["compositions/" + x for x in os.listdir(os.path.join(dst, "compositions")) if x.endswith(".html") and not x.startswith("._")]:
         q = os.path.join(dst, f)
         t = open(q, encoding="utf-8").read()
         open(q, "w", encoding="utf-8").write(t.replace("</style>", css + "</style>", 1))

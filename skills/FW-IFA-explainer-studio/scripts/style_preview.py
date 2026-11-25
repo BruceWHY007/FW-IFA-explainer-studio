@@ -83,6 +83,17 @@ def main():
         d = os.path.join(P, st)
         r = subprocess.run([sys.executable, os.path.join(HERE, "build.py"), pp, "--assets", os.path.join(P, "assets.json"),
                             "--geom", os.path.abspath(a.geom), "--out", d], capture_output=True, text=True, encoding="utf-8")
+        if r.returncode and "头顶只有" in r.stdout + r.stderr:  # 头顶空间不够：开场标题换成身前卡片，和正片的处理一致
+            cards = [{"zh": p_.strip(), "en": f"{k + 1:02d}"} for k, p_ in enumerate(parts) if p_.strip()][:3]
+            if len(cards) < 2:
+                cards.append({"zh": a.phrase.split("|")[0], "en": "02"})
+            plan["segments"][0] = {"id": "h01", "kind": "host", "layout": "chest_cards", "start": 0, "end": 3.2,
+                                   "data": {"cards": cards, "all_on": 1.6}}
+            json.dump(plan, open(pp, "w", encoding="utf-8"), ensure_ascii=False)
+            r = subprocess.run([sys.executable, os.path.join(HERE, "build.py"), pp, "--assets", os.path.join(P, "assets.json"),
+                                "--geom", os.path.abspath(a.geom), "--out", d], capture_output=True, text=True, encoding="utf-8")
+            if not r.returncode and st == list(styles.STYLES)[0]:
+                print("· 头顶空间不够放标题，对照图的开场改用身前卡片（正片同样处理）")
         if r.returncode:
             print(f"✗ {st} 构建失败：{(r.stdout + r.stderr)[-300:]}")
             continue

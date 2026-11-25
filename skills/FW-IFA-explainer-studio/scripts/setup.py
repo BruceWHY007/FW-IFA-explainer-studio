@@ -5,7 +5,7 @@
   GitHub   https://github.com/nexu-io/openmotion
   安装说明 https://github.com/nexu-io/openmotion/blob/main/docs/install.md（npm 发布版，本技能用这个）
   版本与校验 https://releases.open-design.ai/motion
-  本技能在 @openmotion/app 0.1.1 上测试通过。源码安装需要 Node 26，不推荐。
+  本技能在 @openmotion/app 0.2.1 上测试通过。源码安装需要 Node 26，不推荐。
 
 用法：
   python setup.py --check                      只检查，不安装
@@ -17,7 +17,7 @@ Windows 用 py 代替 python。
 import argparse, json, os, platform, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OM_VERSION = "0.1.1"
+OM_VERSION = "0.2.1"
 GITHUB = "https://github.com/nexu-io/openmotion"
 SYS = platform.system()
 IS_WIN = SYS == "Windows"

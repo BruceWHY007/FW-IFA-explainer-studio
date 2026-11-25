@@ -5,7 +5,7 @@
   两侧标签  → 脸两侧、下巴高度，宽度按脸外侧剩余空间算
   身前元素  → 下巴以下
 """
-from .core import W, HOST_H, BuildError, chars, chars_in, esc, plain, rich, fit_fs, floaty, icon, tw, SAFE_X, SAFE_TEXT, TITLE_TOP
+from .core import W, HOST_H, BuildError, chars, chars_in, esc, plain, rich, fit_fs, floaty, icon, tw, SAFE_X, SAFE_TEXT, TITLE_TOP, SAFE_TOP, SAFE_BOTTOM
 from .styles import brush_in
 
 TONES = {
@@ -294,11 +294,11 @@ def gauge(film, seg):
     face_cx = hb[0] + hb[2] / 2
     side = d.get("side") or ("left" if face_cx > W / 2 else "right")
     w_ = 230
-    room = hb[0] - 40 if side == "left" else W - (hb[0] + hb[2]) - 40
+    room = hb[0] - SAFE_X if side == "left" else W - (hb[0] + hb[2]) - SAFE_X
     if room < w_ + 30:
         raise BuildError(f"{seg.id} 侧边只剩 {room:.0f}px，放不下量表")
-    x = 36 if side == "left" else W - 36 - w_
-    y0, hh = 240, 760
+    x = SAFE_X if side == "left" else W - SAFE_X - w_  # 左右、顶部都留在平台安全区里
+    y0, hh = SAFE_TOP + 10, 760
     marks = "".join(
         f'<div class="ab" style="left:0;right:0;top:{hh * (1 - m["pos"]):.0f}px;border-top:3px dashed rgba(255,255,255,.9)">'
         f'<span class="tag" style="left:6px;top:-50px;font-size:30px">{rich(m["label"])}</span></div>' for m in d.get("marks", []))
@@ -325,7 +325,7 @@ def plaque(film, seg):
     """data: zh, en, img（素材键，可选）, t。放在下方、底座上沿，字幕挪到铭牌上面。"""
     d = seg.data
     w_, h_ = 620, 220
-    top = HOST_H - h_ - 46
+    top = SAFE_BOTTOM - h_ - 24  # 底边留在平台安全区里（1483 以下是账号名和标题文案），算上缓动 ±6 和卡片阴影也不越线
     x = (W - w_) / 2
     img = (f'<div class="ab" style="left:0;top:0;width:{w_ * 0.42:.0f}px;height:100%;background:url(\'{film.a(d["img"])}\') center/cover;'
            f'-webkit-mask:linear-gradient(270deg,transparent,#000 50%)"></div>') if d.get("img") else ""
