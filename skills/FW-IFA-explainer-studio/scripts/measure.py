@@ -13,6 +13,7 @@ build 按每段时间取这一段里最不利的位置（脸框取并集、头�
 import argparse, json, os, platform, shutil, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
 CACHE = os.path.join(os.path.expanduser("~"), ".cache", "ifa-tujie")
 
 
@@ -146,6 +147,14 @@ def main():
         tops = [f["head_top"] for f in ok if f["head_top"] is not None]
         print(f"[{backend}] {len(frames)} 帧，{len(ok)} 帧有人脸；脸顶中位 {st.median(f['face'][1] for f in ok):.0f}px，"
               f"脸高中位 {st.median(f['face'][3] for f in ok):.0f}px，头顶最高 {min(tops) if tops else '—'}px")
+        # 人物段能用哪些版式：和 build 同一套算法，现在就报，写草稿时避开放不下的版式
+        from tujie import room
+        geom = json.load(open(a.out, encoding="utf-8"))
+        r, lines = room.summary(geom)
+        geom["room"] = r
+        json.dump(geom, open(a.out, "w", encoding="utf-8"), ensure_ascii=False)
+        for ln in lines:
+            print("· " + ln)
     else:
         sys.exit(f"[{backend}] {len(frames)} 帧，没有检测到人脸")
 

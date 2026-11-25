@@ -71,11 +71,21 @@ def main():
     parts = a.title.split("|")
     sp = [[p_ + (" " if k < len(parts) - 1 else ""), "T2" if k == 0 and len(parts) > 1 else "T1"] for k, p_ in enumerate(parts)]
     tl = [{"spans": sp, "t": 0.1}]
+    from tujie import room
+    head_ok = room.title_ok(room.Geo(json.load(open(a.geom, encoding="utf-8"))), 0, 3.2)
+    if head_ok:
+        opening = {"id": "h01", "kind": "host", "layout": "title_top", "start": 0, "end": 3.2, "data": {"lines": tl}}
+    else:  # 头顶空间不够：开场标题换成身前卡片，和正片的处理一致
+        cards = [{"zh": p_.strip(), "en": f"{k + 1:02d}"} for k, p_ in enumerate(parts) if p_.strip()][:3]
+        if len(cards) < 2:
+            cards.append({"zh": a.phrase.split("|")[0], "en": "02"})
+        opening = {"id": "h01", "kind": "host", "layout": "chest_cards", "start": 0, "end": 3.2, "data": {"cards": cards, "all_on": 1.6}}
+        print("· 开场头顶空间不够放标题，对照图的开场改用身前卡片（正片同样处理）")
     shots = []
     for st in styles.STYLES:
         plan = {"title": "风格对照", "style": st, "duration": 6.4, "aroll_duration": 6.4, "captions": "captions.json",
                 "host": {"name": "", "badge": ["", ""]}, "chapters": [[0, "开场"], [3.2, "要点"], [5.0, "结论"]],
-                "segments": [{"id": "h01", "kind": "host", "layout": "title_top", "start": 0, "end": 3.2, "data": {"lines": tl}},
+                "segments": [opening,
                              {"id": "s02", "kind": "graphic", "layout": "quote", "start": 3.2, "end": 6.4,
                               "data": {"lab1": "", "en1": "", "big1": a.phrase, "t1": 3.5}}]}
         pp = os.path.join(P, f"plan_{st}.json")
@@ -83,17 +93,6 @@ def main():
         d = os.path.join(P, st)
         r = subprocess.run([sys.executable, os.path.join(HERE, "build.py"), pp, "--assets", os.path.join(P, "assets.json"),
                             "--geom", os.path.abspath(a.geom), "--out", d], capture_output=True, text=True, encoding="utf-8")
-        if r.returncode and "头顶只有" in r.stdout + r.stderr:  # 头顶空间不够：开场标题换成身前卡片，和正片的处理一致
-            cards = [{"zh": p_.strip(), "en": f"{k + 1:02d}"} for k, p_ in enumerate(parts) if p_.strip()][:3]
-            if len(cards) < 2:
-                cards.append({"zh": a.phrase.split("|")[0], "en": "02"})
-            plan["segments"][0] = {"id": "h01", "kind": "host", "layout": "chest_cards", "start": 0, "end": 3.2,
-                                   "data": {"cards": cards, "all_on": 1.6}}
-            json.dump(plan, open(pp, "w", encoding="utf-8"), ensure_ascii=False)
-            r = subprocess.run([sys.executable, os.path.join(HERE, "build.py"), pp, "--assets", os.path.join(P, "assets.json"),
-                                "--geom", os.path.abspath(a.geom), "--out", d], capture_output=True, text=True, encoding="utf-8")
-            if not r.returncode and st == list(styles.STYLES)[0]:
-                print("· 头顶空间不够放标题，对照图的开场改用身前卡片（正片同样处理）")
         if r.returncode:
             print(f"✗ {st} 构建失败：{(r.stdout + r.stderr)[-300:]}")
             continue

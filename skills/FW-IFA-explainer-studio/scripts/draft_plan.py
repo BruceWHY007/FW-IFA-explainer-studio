@@ -3,7 +3,8 @@
 按风格和差异规则建议版式和段落层参数，时间尽量写成「@关键词」（跟着本人说话走）。Agent 再逐段改。
 
 用法：python draft_plan.py --captions captions.json --style tanjin --title "片名" --host 主讲人 --badge 名,后缀 --out plan_draft.json
-      [--chartimes chartimes.json] [--cuts cuts.json] [--duration 145.4] [--aroll-duration 144.4] [--account 账号]
+      [--geom geom.json] [--chartimes chartimes.json] [--cuts cuts.json] [--duration 145.4] [--aroll-duration 144.4] [--account 账号]
+给了 --geom 就按人物实际位置避开放不下的版式：头顶不够不出头顶标题（开场改身前卡片），脸两侧不够不出对立标签。
 草稿里所有 B-roll、配图、英文副题、章节名都标了 TODO，素材键是 band_TODO_1 这样的占位：不改 build 会直接报错，避免带着占位出片。
 """
 import argparse, json, os, re, sys
@@ -15,6 +16,7 @@ sys.path.insert(0, HERE)
 from tujie import styles  # noqa: E402
 from build import BAD_WORDS, GOOD_WORDS, LIMITS, DEFAULT_LIMIT  # noqa: E402
 from icons import ZH  # noqa: E402
+from tujie import room  # noqa: E402
 
 NUM = re.compile(r"(\d+(?:\.\d+)?\s*(?:%|万|亿|千|百|倍|年|元|块|美元|个)?)")
 LIST_W = ("第一", "第二", "第三", "首先", "其次", "然后", "最后", "另外", "还有", "一是", "二是")
@@ -63,8 +65,8 @@ def classify(text, k, n):
 CANDS = {  # 每类内容可用的版式（人物段, 图解段）
     "number": (["counter"], ["bignum", "compare", "bars"]),
     "list": (["chest_cards"], ["chain", "cascade", "grid4", "product_row", "pip_cards"]),
-    "contrast": (["side_tags"], ["compare"]),
-    "question": (["title_top"], ["quote", "chapter"]),
+    "contrast": (["side_tags", "chest_cards"], ["compare"]),
+    "question": (["title_top", "sticker"], ["quote", "chapter"]),
     "person": (["namecard"], []),
     "conclusion": (["sticker"], ["quote"]),
     "talk": (["plain", "chest_cards"], ["band", "bigword_band", "doc", "tilt_chart"]),
@@ -78,9 +80,20 @@ def main():
     ap.add_argument("--host", default="主讲人"); ap.add_argument("--badge", default=""); ap.add_argument("--account", default="")
     ap.add_argument("--chartimes"); ap.add_argument("--cuts"); ap.add_argument("--duration", type=float); ap.add_argument("--aroll-duration", type=float)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--geom", help="measure.py 的 geom.json：按人物位置避开放不下的头顶标题、对立标签")
     ap.add_argument("--fill-placeholders", help="自检用：把 TODO 素材键换成现成的键，如 band=band_demo,thumb=thumb_demo1,tile=band_demo")
     a = ap.parse_args()
     st = styles.get(a.style)
+    G = room.Geo(json.load(open(a.geom, encoding="utf-8"))) if a.geom else None
+
+    def fits(lay, t0, t1):
+        if G is None:
+            return True
+        if lay == "title_top":
+            return room.title_ok(G, t0, t1)
+        if lay == "side_tags":
+            return room.side_ok(G, t0, t1)
+        return True
     caps = json.load(open(a.captions, encoding="utf-8"))
     dur = a.duration or round(caps[-1]["end"] + 1.4, 2)
     adur = a.aroll_duration or round(caps[-1]["end"] + 0.3, 2)
@@ -129,6 +142,9 @@ def main():
         ph = phrases(t) or [t]
         if cls == "open":
             kind, lay = "host", "title_top"
+            if not fits("title_top", s0, s1):
+                lay = "chest_cards"
+                todo.append(f"h{k + 1:02d}：头顶只有 {room.title_avail(G, s0, s1):.0f}px，放不下标题，开场改用身前卡片")
         elif cls == "end":
             kind, lay = "graphic", "ending"
         else:
@@ -136,13 +152,13 @@ def main():
             want_g = cls in ("list", "number") or (h_run >= 2) or (cls == "talk" and segs and segs[-1]["kind"] == "host")
             if g_run >= 2 and hc:
                 want_g = False
-            if cls == "contrast" and side < 2 and not want_g:
+            if cls == "contrast" and side < 2 and not want_g and fits("side_tags", s0, s1):
                 lay = "side_tags"; kind = "host"; side += 1
             else:
                 lay = pick(gc, cls) if (want_g and gc) else None
                 kind = "graphic" if lay else "host"
                 if not lay:
-                    lay = pick([c for c in hc if c != "side_tags" or side < 2], cls) or "plain"
+                    lay = pick([c for c in hc if (c != "side_tags" or side < 2) and fits(c, s0, s1)], cls) or "plain"
         used[lay] = used.get(lay, 0) + 1
         g_run = g_run + 1 if kind == "graphic" else 0
         h_run = h_run + 1 if kind == "host" else 0
@@ -268,6 +284,9 @@ def main():
         plan = json.loads(txt)
     json.dump(plan, open(a.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(f"草稿：{len(segs)} 段（人物 {sum(1 for s in segs if s['kind'] == 'host')}、图解 {sum(1 for s in segs if s['kind'] == 'graphic')}），{len(chapters)} 章，母题 {motif}")
+    if G is not None:
+        for ln in room.summary(G.geom)[1]:
+            print("  人物空间｜" + ln)
     for sg in segs:
         print(f"  {sg['id']} {sg['start']:6.1f}–{sg['end']:6.1f} {sg['kind']:7s} {sg['layout']:13s} {clip(sg['_text'], 24)}")
     print("待办：\n  - " + "\n  - ".join(plan["_todo"]))

@@ -7,6 +7,7 @@
 """
 from .core import W, HOST_H, BuildError, chars, chars_in, esc, plain, rich, fit_fs, floaty, icon, tw, SAFE_X, SAFE_TEXT, TITLE_TOP, SAFE_TOP, SAFE_BOTTOM
 from .styles import brush_in
+from .room import TITLE_MIN_FS, SIDE_MIN
 
 TONES = {
     "info": ("#6E9BFF", "linear-gradient(180deg,rgba(28,42,78,.9),rgba(10,16,34,.95))"),
@@ -75,7 +76,7 @@ def head_title(film, seg, ln, out=None):
     bottom = head - 22
     avail = bottom - TITLE_TOP
     fs = min(ln.get("size", 112), fit_fs(txt, W - 2 * SAFE_TEXT, 112, 30), int(avail))
-    if fs < 56:
+    if fs < TITLE_MIN_FS:
         raise BuildError(f"{seg.id} 头顶只有 {avail:.0f}px，标题放不下（字号 {fs}px 太小）。缩短标题，或换成身前卡片 chest_cards")
     y = TITLE_TOP + (avail - fs) / 2
     lid = f"{seg.id}-l0"
@@ -122,8 +123,8 @@ def side_tags(film, seg):
     room_l = hb[0] - SAFE_X - 16
     room_r = W - (hb[0] + hb[2]) - SAFE_X - 16
     tw_ = min(300, room_l, room_r)
-    if tw_ < 220:
-        raise BuildError(f"{seg.id} 脸两侧只剩 {tw_:.0f}px，放不下对立标签（至少 220px）。换成身前卡片 chest_cards")
+    if tw_ < SIDE_MIN:
+        raise BuildError(f"{seg.id} 脸两侧只剩 {tw_:.0f}px，放不下对立标签（至少 {SIDE_MIN}px）。换成身前卡片 chest_cards")
     y_l = c_y - tag_h + 10
     y_r = c_y - tag_h - 50
     lc, lbg = tone(film, d.get("tones", ["info", "accent"])[0])
